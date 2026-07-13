@@ -56,10 +56,17 @@
       "legalTrademarks": "",
       "target": [
         {
-          "target": "portable",
+          "target": "nsis",
           "arch": ["x64"]
         }
       ]
+    },
+    "nsis": {
+      "oneClick": false,
+      "perMachine": false,
+      "allowToChangeInstallationDirectory": true,
+      "createDesktopShortcut": true,
+      "createStartMenuShortcut": true
     },
     "files": [
       "src/**/*",
@@ -77,12 +84,5 @@
       "owner": "coldevotion",
       "repo": "trackcast"
     }
-  },
-  "pnpm": {
-    "onlyBuiltDependencies": [
-      "electron",
-      "electron-builder",
-      "electron-winstaller"
-    ]
   }
 }
