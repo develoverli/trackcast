@@ -10,6 +10,7 @@ A lightweight Electron desktop app that polls the Spotify *currently playing* en
 [![Made with Electron](https://img.shields.io/badge/Electron-33-47848F.svg)](https://www.electronjs.org/)
 [![PRs welcome](https://img.shields.io/badge/PRs-welcome-brightgreen.svg)](CONTRIBUTING.md)
 
+<img width="868" height="587" alt="image" src="https://github.com/user-attachments/assets/b0260f84-b1ce-48b1-a8d9-e14273608ca5" />
 </div>
 
 ---
