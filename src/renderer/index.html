@@ -1,0 +1,673 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline'; img-src 'self' data: https:; connect-src 'self' http://localhost:*">
+  <title>TrackCast</title>
+  <link rel="stylesheet" href="styles.css">
+</head>
+<body>
+  <div id="app">
+    <header class="titlebar" role="banner">
+      <div class="titlebar__brand">
+        <svg class="titlebar__brand-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+          <path d="M9 18V5l12-2v13"/>
+          <circle cx="6" cy="18" r="3"/>
+          <circle cx="18" cy="16" r="3"/>
+        </svg>
+        <span>TrackCast</span>
+      </div>
+      <div class="titlebar__controls">
+        <button class="titlebar__btn" id="win-minimize" type="button" aria-label="Minimize" title="Minimize">
+          <svg viewBox="0 0 12 12" aria-hidden="true"><path d="M2 6h8"/></svg>
+        </button>
+        <button class="titlebar__btn" id="win-maximize" type="button" aria-label="Maximize" title="Maximize">
+          <svg id="win-maximize-icon" viewBox="0 0 12 12" aria-hidden="true"><rect x="2" y="2" width="8" height="8"/></svg>
+        </button>
+        <button class="titlebar__btn titlebar__btn--close" id="win-close" type="button" aria-label="Close" title="Close">
+          <svg viewBox="0 0 12 12" aria-hidden="true"><path d="M2 2l8 8M10 2l-8 8"/></svg>
+        </button>
+      </div>
+    </header>
+
+    <div class="app-body app-body--wizard" id="app-body">
+      <aside class="sidebar" id="sidebar" hidden>
+        <nav class="sidebar__nav" aria-label="Main">
+          <button class="sidebar__item is-active" data-view="home" type="button">
+            <svg class="sidebar__icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+              <path d="M9 18V5l12-2v13"/>
+              <circle cx="6" cy="18" r="3"/>
+              <circle cx="18" cy="16" r="3"/>
+            </svg>
+            <span>Home</span>
+          </button>
+          <button class="sidebar__item" data-view="settings" type="button">
+            <svg class="sidebar__icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+              <circle cx="12" cy="12" r="3"/>
+              <path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1 0 2.83 2 2 0 0 1-2.83 0l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83 0 2 2 0 0 1 0-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 0-2.83 2 2 0 0 1 2.83 0l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 0 2 2 0 0 1 0 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z"/>
+            </svg>
+            <span>Settings</span>
+          </button>
+          <button class="sidebar__item" data-view="help" type="button">
+            <svg class="sidebar__icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+              <circle cx="12" cy="12" r="10"/>
+              <path d="M9.09 9a3 3 0 0 1 5.83 1c0 2-3 3-3 3"/>
+              <line x1="12" y1="17" x2="12.01" y2="17"/>
+            </svg>
+            <span>Help</span>
+          </button>
+        </nav>
+
+        <div class="sidebar__footer">
+          <div class="sidebar__status" id="footer-spotify">
+            <span class="status-dot status-dot--idle" aria-hidden="true"></span>
+            <span>Spotify</span>
+          </div>
+          <div class="sidebar__status" id="footer-obs">
+            <span class="status-dot status-dot--idle" aria-hidden="true"></span>
+            <span>OBS</span>
+          </div>
+          <button class="sidebar__polling" id="btn-sidebar-polling" type="button" aria-label="Toggle polling">
+            <span class="sidebar__polling-dot" aria-hidden="true"></span>
+            <span id="sidebar-polling-label">Polling on</span>
+          </button>
+        </div>
+      </aside>
+
+      <main class="app-main" id="app-main">
+        <div class="wizard" id="wizard-container">
+      <!-- Step 1: Welcome -->
+      <section id="step-welcome" class="step active">
+        <div class="step-content">
+          <div class="welcome-icon">&#127925;</div>
+          <h1>Welcome to TrackCast</h1>
+          <p>Display your currently playing Spotify track as an overlay in OBS Studio.</p>
+          
+          <div class="feature-list">
+            <div class="feature-item">
+              <span class="feature-icon">&#10003;</span>
+              <span>Works with Spotify and OBS WebSocket</span>
+            </div>
+            <div class="feature-item">
+              <span class="feature-icon">&#10003;</span>
+              <span>Automatically updates as songs change</span>
+            </div>
+            <div class="feature-item">
+              <span class="feature-icon">&#10003;</span>
+              <span>Runs in background with system tray</span>
+            </div>
+          </div>
+
+          <button id="btn-start-setup" class="btn btn-primary btn-large">
+            Get Started
+          </button>
+        </div>
+      </section>
+
+      <!-- Step 2: Spotify -->
+      <section id="step-spotify" class="step">
+        <div class="step-header">
+          <span class="step-number">1</span>
+          <div>
+            <h2>Connect Spotify</h2>
+            <p>Authorize the app to read your currently playing track</p>
+          </div>
+        </div>
+
+        <div class="step-content">
+          <div id="spotify-not-configured" class="setup-section">
+            <h3>Create a Spotify App</h3>
+            <p>You need a Spotify Developer app to use this tool.</p>
+            
+            <button id="btn-open-spotify-dev" class="btn btn-secondary">
+              Open Spotify Developer Dashboard
+            </button>
+
+            <div class="setup-instructions">
+              <ol>
+                <li>Go to <strong>developer.spotify.com/dashboard</strong></li>
+                <li>Create a new app (give it any name)</li>
+                <li>Go to <strong>Edit Settings</strong></li>
+                <li>Add <code id="redirect-uri-display">http://localhost:8888/callback</code> to <strong>Redirect URIs</strong></li>
+                <li>Save settings</li>
+                <li>Copy your <strong>Client ID</strong> and <strong>Client Secret</strong></li>
+              </ol>
+            </div>
+
+            <div class="form-group">
+              <label for="spotify-client-id">Client ID</label>
+              <input type="text" id="spotify-client-id" placeholder="Paste your Client ID">
+            </div>
+
+            <div class="form-group">
+              <label for="spotify-client-secret">Client Secret</label>
+              <input type="password" id="spotify-client-secret" placeholder="Paste your Client Secret">
+            </div>
+
+            <div class="form-group">
+              <label for="spotify-redirect-uri">Redirect URI</label>
+              <input type="text" id="spotify-redirect-uri" value="http://localhost:8888/callback" readonly>
+              <span class="form-hint">Must match exactly what's in your Spotify app settings</span>
+            </div>
+          </div>
+
+          <div id="spotify-auth-section" class="setup-section hidden">
+            <div class="auth-status">
+              <span class="auth-icon">&#10004;</span>
+              <div>
+                <strong>Spotify credentials saved</strong>
+                <p id="spotify-user-info">Ready to authorize</p>
+              </div>
+            </div>
+          </div>
+
+          <div id="spotify-authorize-section" class="setup-section hidden">
+            <h3>Authorize with Spotify</h3>
+            <p>Click the button below to authorize the app to access your Spotify account.</p>
+            <button id="btn-authorize-spotify" class="btn btn-primary">
+              Authorize with Spotify
+            </button>
+            <p id="auth-status" class="auth-status-text"></p>
+          </div>
+
+          <div class="step-actions">
+            <button id="btn-spotify-back" class="btn btn-ghost">Back</button>
+            <button id="btn-spotify-next" class="btn btn-primary" disabled>Continue</button>
+          </div>
+        </div>
+      </section>
+
+      <!-- Step 3: OBS -->
+      <section id="step-obs" class="step">
+        <div class="step-header">
+          <span class="step-number">2</span>
+          <div>
+            <h2>Connect OBS</h2>
+            <p>Configure the connection to your OBS Studio</p>
+          </div>
+        </div>
+
+        <div class="step-content">
+          <div class="setup-section">
+            <h3>Enable OBS WebSocket</h3>
+            <p>In OBS Studio, go to <strong>Tools > obs-websocket Settings</strong>:</p>
+            <ul class="setup-instructions inline">
+              <li>Enable <strong>obs-websocket</strong></li>
+              <li>Set a <strong>Server Password</strong> (or leave blank)</li>
+              <li>Copy the <strong>Host</strong> and <strong>Port</strong></li>
+            </ul>
+          </div>
+
+          <div class="form-group">
+            <label for="obs-host">Host</label>
+            <input type="text" id="obs-host" value="localhost" placeholder="localhost">
+          </div>
+
+          <div class="form-group">
+            <label for="obs-port">Port</label>
+            <input type="number" id="obs-port" value="4455" placeholder="4455">
+          </div>
+
+          <div class="form-group">
+            <label for="obs-password">Server Password</label>
+            <input type="password" id="obs-password" placeholder="Leave blank if none">
+          </div>
+
+          <div class="form-group">
+            <label for="obs-source-name">Text Source Name</label>
+            <input type="text" id="obs-source-name" value="SpotifyNowPlaying" placeholder="SpotifyNowPlaying">
+            <span class="form-hint">The name of the text source in OBS to update. It will be created if it doesn't exist.</span>
+          </div>
+
+          <div class="test-connection">
+            <button id="btn-test-obs" class="btn btn-secondary">
+              Test Connection
+            </button>
+            <span id="obs-test-result" class="test-result"></span>
+          </div>
+
+          <div class="source-panel" id="source-panel" hidden>
+            <h3>Text Source</h3>
+            <p class="form-hint">Make sure the text source exists in OBS so the app can update it.</p>
+            <button id="btn-check-source" class="btn btn-secondary" type="button">
+              Check if it exists
+            </button>
+            <div class="source-result" id="source-result" hidden></div>
+          </div>
+
+          <div class="step-actions">
+            <button id="btn-obs-back" class="btn btn-ghost">Back</button>
+            <button id="btn-obs-next" class="btn btn-primary">Continue</button>
+          </div>
+        </div>
+      </section>
+
+      <!-- Step 4: Overlay Customization -->
+      <section id="step-overlay" class="step">
+        <div class="step-header">
+          <span class="step-number">3</span>
+          <div>
+            <h2>Customize Overlay</h2>
+            <p>Personalize how your track info appears in OBS</p>
+          </div>
+        </div>
+
+        <div class="step-content">
+          <div class="form-group">
+            <label for="overlay-format">Text Format</label>
+            <input type="text" id="overlay-format" value="&#127925; {trackName} &#8212; {artistName}" placeholder="{trackName} - {artistName}">
+            <span class="form-hint">Use {trackName} and {artistName} as placeholders</span>
+          </div>
+
+          <div class="form-group">
+            <label for="overlay-idle-text">Idle Text</label>
+            <input type="text" id="overlay-idle-text" placeholder="Leave empty to show nothing when paused">
+            <span class="form-hint">Text to show when nothing is playing (leave empty to hide)</span>
+          </div>
+
+          <div class="form-group">
+            <label class="checkbox-label">
+              <input type="checkbox" id="overlay-show-only-playing" checked>
+              <span>Show only when a track is playing</span>
+            </label>
+          </div>
+
+          <div class="preview-section">
+            <h3>Preview</h3>
+            <div id="overlay-preview" class="overlay-preview">
+              <div class="preview-text" id="preview-text">Song Title &#8212; Artist Name</div>
+            </div>
+          </div>
+
+          <div class="step-actions">
+            <button id="btn-overlay-back" class="btn btn-ghost">Back</button>
+            <button id="btn-overlay-next" class="btn btn-primary">Continue</button>
+          </div>
+        </div>
+      </section>
+
+      <!-- Step 5: Behavior -->
+      <section id="step-behavior" class="step">
+        <div class="step-header">
+          <span class="step-number">4</span>
+          <div>
+            <h2>Behavior Settings</h2>
+            <p>Configure how the app runs on your computer</p>
+          </div>
+        </div>
+
+        <div class="step-content">
+          <div class="form-group">
+            <label for="polling-interval">Polling Interval</label>
+            <div class="range-wrapper">
+              <input type="range" id="polling-interval" min="2000" max="30000" step="1000" value="5000">
+              <span id="polling-interval-display">5000ms</span>
+            </div>
+            <span class="form-hint">How often to check for track changes (2s - 30s)</span>
+          </div>
+
+          <div class="form-group">
+            <label class="checkbox-label">
+              <input type="checkbox" id="behavior-start-minimized">
+              <span>Start minimized to tray</span>
+            </label>
+          </div>
+
+          <div class="form-group">
+            <label class="checkbox-label">
+              <input type="checkbox" id="behavior-minimize-to-tray" checked>
+              <span>Minimize to system tray instead of closing</span>
+            </label>
+          </div>
+
+          <div class="form-group">
+            <label class="checkbox-label">
+              <input type="checkbox" id="behavior-auto-reconnect" checked>
+              <span>Auto-reconnect if OBS disconnects</span>
+            </label>
+          </div>
+
+          <div class="form-group">
+            <label class="checkbox-label">
+              <input type="checkbox" id="behavior-auto-start">
+              <span>Start with Windows</span>
+            </label>
+          </div>
+
+          <div class="step-actions">
+            <button id="btn-behavior-back" class="btn btn-ghost">Back</button>
+            <button id="btn-behavior-next" class="btn btn-primary">Finish Setup</button>
+          </div>
+        </div>
+      </section>
+
+      <!-- Step 6: Complete -->
+      <section id="step-complete" class="step">
+        <div class="step-content">
+          <div class="complete-icon">&#127925;</div>
+          <h1>Setup Complete!</h1>
+          <p>Your TrackCast overlay is ready.</p>
+          
+          <div id="current-track-display" class="current-track-display">
+            <div class="track-info">
+              <span id="complete-track-name">Waiting for track...</span>
+              <span id="complete-track-artist"></span>
+            </div>
+          </div>
+
+          <div class="controls-section">
+            <button id="btn-toggle-polling" class="btn btn-secondary btn-large">
+              Pause Tracking
+            </button>
+          </div>
+
+          <div class="complete-actions">
+            <button id="btn-open-settings" class="btn btn-ghost">
+              Open Settings
+            </button>
+            <button id="btn-minimize-to-tray" class="btn btn-primary">
+              Minimize to Tray
+            </button>
+          </div>
+        </div>
+      </section>
+
+        </div>
+        <!-- /wizard-container -->
+
+        <!-- Home View (Now Playing) -->
+        <section id="view-home" class="view" hidden aria-label="Now Playing">
+          <div class="view__inner view__inner--centered">
+
+            <!-- Playing state -->
+            <div class="now-playing" id="now-playing" hidden>
+              <div class="now-playing__cover">
+                <img class="now-playing__art" id="np-art" alt="" loading="eager">
+                <div class="now-playing__art-fallback" id="np-art-fallback" hidden aria-hidden="true">
+                  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round">
+                    <path d="M9 18V5l12-2v13"/>
+                    <circle cx="6" cy="18" r="3"/>
+                    <circle cx="18" cy="16" r="3"/>
+                  </svg>
+                </div>
+                <div class="equalizer" id="np-equalizer" aria-hidden="true">
+                  <span></span><span></span><span></span><span></span><span></span>
+                </div>
+              </div>
+
+              <div class="now-playing__meta">
+                <h1 class="now-playing__track" id="np-track">—</h1>
+                <p class="now-playing__artist" id="np-artist"></p>
+                <p class="now-playing__album" id="np-album"></p>
+              </div>
+
+              <div class="now-playing__progress">
+                <div class="progress-bar" role="progressbar" aria-valuemin="0" aria-valuemax="100" aria-valuenow="0" id="np-progress">
+                  <div class="progress-bar__fill" id="np-progress-fill"></div>
+                </div>
+                <div class="progress-bar__times">
+                  <span class="text-mono" id="np-time-current">0:00</span>
+                  <span class="text-mono" id="np-time-total">0:00</span>
+                </div>
+              </div>
+
+              <div class="now-playing__obs-status" id="np-obs-status">
+                <span class="badge badge--success">
+                  <span class="badge__dot" aria-hidden="true"></span>
+                  Sending to OBS · <span id="np-obs-source">SpotifyNowPlaying</span>
+                </span>
+              </div>
+            </div>
+
+            <!-- Empty state (no track) -->
+            <div class="empty-state" id="np-empty">
+              <svg class="empty-state__icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+                <path d="M9 18V5l12-2v13"/>
+                <circle cx="6" cy="18" r="3"/>
+                <circle cx="18" cy="16" r="3"/>
+                <line x1="2" y1="2" x2="22" y2="22"/>
+              </svg>
+              <h2 class="empty-state__title">Nothing playing right now</h2>
+              <p class="empty-state__body">Hit play on Spotify and the track will appear here, and on your OBS overlay.</p>
+            </div>
+
+          </div>
+        </section>
+
+        <!-- Help View -->
+        <section id="view-help" class="view" hidden>
+          <div class="view__inner help">
+            <div class="help__header">
+              <div>
+                <h2 class="view__title" data-i18n="help.title">Help &amp; Setup Guide</h2>
+                <p class="view__lede" data-i18n="help.lede">Everything you need to get TrackCast working with Spotify and OBS.</p>
+              </div>
+              <div class="help__lang" role="tablist" aria-label="Language">
+                <button class="help__lang-btn" data-lang="en" type="button" role="tab">EN</button>
+                <button class="help__lang-btn" data-lang="es" type="button" role="tab">ES</button>
+              </div>
+            </div>
+
+            <article class="help__section">
+              <h3 data-i18n="help.quickstart.title">Quick Start</h3>
+              <ol data-i18n="help.quickstart.body">
+                <li>Create a free Spotify Developer app and copy its Client ID and Secret.</li>
+                <li>Turn on OBS WebSocket (Tools menu inside OBS Studio).</li>
+                <li>Run this app and follow the wizard. Done.</li>
+              </ol>
+            </article>
+
+            <article class="help__section">
+              <h3 data-i18n="help.spotify.title">Step 1 · Create a Spotify Developer App</h3>
+              <ol data-i18n="help.spotify.body">
+                <li>Go to <strong>developer.spotify.com/dashboard</strong> and sign in with your Spotify account.</li>
+                <li>Click <strong>Create app</strong>. Name and description can be anything.</li>
+                <li>In <strong>Redirect URIs</strong> add exactly: <code>http://localhost:8888/callback</code></li>
+                <li>Save. Open the app, then click <strong>Settings</strong> to copy your Client ID and Client Secret.</li>
+              </ol>
+            </article>
+
+            <article class="help__section">
+              <h3 data-i18n="help.obs.title">Step 2 · Enable OBS WebSocket</h3>
+              <ol data-i18n="help.obs.body">
+                <li>Open OBS Studio.</li>
+                <li>Top menu: <strong>Tools → WebSocket Server Settings</strong>.</li>
+                <li>Check <strong>Enable WebSocket server</strong>.</li>
+                <li>Set a server password and note it down. Default port is <code>4455</code>.</li>
+                <li>Click OK.</li>
+              </ol>
+            </article>
+
+            <article class="help__section">
+              <h3 data-i18n="help.source.title">Step 3 · Add the text source</h3>
+              <p data-i18n="help.source.body">In the OBS step of the wizard, after the connection test passes, click "Check if it exists". If the source does not exist yet, the app can create it for you in the current scene. You can then drag, resize, and style it from inside OBS.</p>
+            </article>
+
+            <article class="help__section">
+              <h3 data-i18n="help.format.title">Customizing the overlay text</h3>
+              <p data-i18n="help.format.intro">The format field accepts two placeholders:</p>
+              <ul data-i18n="help.format.list">
+                <li><code>{trackName}</code> &mdash; current track title</li>
+                <li><code>{artistName}</code> &mdash; artist or comma-separated artists</li>
+              </ul>
+              <p data-i18n="help.format.example">Example: <code>♫ {trackName} by {artistName}</code></p>
+            </article>
+
+            <article class="help__section">
+              <h3 data-i18n="help.troubleshoot.title">Troubleshooting</h3>
+              <dl class="help__faq" data-i18n="help.troubleshoot.body">
+                <dt>OBS source does not update</dt>
+                <dd>Confirm the source name in OBS matches the one configured in the app exactly, including capitalization.</dd>
+                <dt>OBS connection fails</dt>
+                <dd>Check that OBS WebSocket is enabled, the password matches, and Windows Firewall is not blocking port 4455.</dd>
+                <dt>Spotify authorization fails</dt>
+                <dd>Verify the redirect URI in your Spotify Developer dashboard is exactly <code>http://localhost:8888/callback</code>, no trailing slash.</dd>
+                <dt>"Token expired" keeps appearing</dt>
+                <dd>The app auto-refreshes tokens 5 minutes before expiry. If errors persist, go to Settings → Spotify and re-authorize.</dd>
+                <dt>App icon stays grey in tray</dt>
+                <dd>Polling is paused, no Spotify track is playing, or the Spotify connection dropped. Resume polling from the sidebar footer.</dd>
+              </dl>
+            </article>
+
+            <article class="help__section">
+              <h3 data-i18n="help.logs.title">Logs &amp; reporting bugs</h3>
+              <p data-i18n="help.logs.body">Detailed logs are stored at <code>%APPDATA%\TrackCast\logs\main.log</code>. Include the last 100 lines when reporting an issue on GitHub.</p>
+            </article>
+          </div>
+        </section>
+
+      <!-- Settings View (existing) -->
+      <section id="view-settings" class="view" hidden>
+        <div class="view-header">
+          <h2>Settings</h2>
+          <button id="btn-close-settings" class="btn-icon" title="Close">&times;</button>
+        </div>
+
+        <div class="settings-tabs">
+          <button class="tab-btn active" data-tab="tab-spotify">Spotify</button>
+          <button class="tab-btn" data-tab="tab-obs">OBS</button>
+          <button class="tab-btn" data-tab="tab-overlay">Overlay</button>
+          <button class="tab-btn" data-tab="tab-behavior">Behavior</button>
+          <button class="tab-btn" data-tab="tab-about">About</button>
+          <button class="tab-btn" data-tab="tab-logs">Logs</button>
+        </div>
+
+        <div class="settings-content">
+          <div id="tab-spotify" class="tab-panel active">
+            <div class="form-group">
+              <label>Client ID</label>
+              <input type="text" id="settings-spotify-client-id">
+            </div>
+            <div class="form-group">
+              <label>Client Secret</label>
+              <input type="password" id="settings-spotify-client-secret">
+            </div>
+            <div class="form-group">
+              <label>Redirect URI</label>
+              <input type="text" id="settings-spotify-redirect-uri">
+            </div>
+            <div id="settings-auth-section" class="hidden">
+              <button id="btn-reauthorize-spotify" class="btn btn-primary">Re-authorize Spotify</button>
+            </div>
+          </div>
+
+          <div id="tab-obs" class="tab-panel">
+            <div class="form-group">
+              <label>Host</label>
+              <input type="text" id="settings-obs-host">
+            </div>
+            <div class="form-group">
+              <label>Port</label>
+              <input type="number" id="settings-obs-port">
+            </div>
+            <div class="form-group">
+              <label>Password</label>
+              <input type="password" id="settings-obs-password">
+            </div>
+            <div class="form-group">
+              <label>Text Source Name</label>
+              <input type="text" id="settings-obs-source-name">
+            </div>
+            <button id="btn-test-obs-settings" class="btn btn-secondary">Test Connection</button>
+            <span id="settings-obs-test-result" class="test-result"></span>
+          </div>
+
+          <div id="tab-overlay" class="tab-panel">
+            <div class="form-group">
+              <label>Text Format</label>
+              <input type="text" id="settings-overlay-format">
+            </div>
+            <div class="form-group">
+              <label>Idle Text</label>
+              <input type="text" id="settings-overlay-idle-text">
+            </div>
+            <div class="form-group">
+              <label class="checkbox-label">
+                <input type="checkbox" id="settings-overlay-show-only">
+                <span>Show only when playing</span>
+              </label>
+            </div>
+          </div>
+
+          <div id="tab-behavior" class="tab-panel">
+            <div class="form-group">
+              <label>Polling Interval</label>
+              <div class="range-wrapper">
+                <input type="range" id="settings-polling-interval" min="2000" max="30000" step="1000" value="5000">
+                <span id="settings-polling-display">5000ms</span>
+              </div>
+            </div>
+            <div class="form-group">
+              <label class="checkbox-label">
+                <input type="checkbox" id="settings-start-minimized">
+                <span>Start minimized</span>
+              </label>
+            </div>
+            <div class="form-group">
+              <label class="checkbox-label">
+                <input type="checkbox" id="settings-minimize-to-tray">
+                <span>Minimize to tray</span>
+              </label>
+            </div>
+            <div class="form-group">
+              <label class="checkbox-label">
+                <input type="checkbox" id="settings-auto-reconnect">
+                <span>Auto-reconnect</span>
+              </label>
+            </div>
+            <div class="form-group">
+              <label class="checkbox-label">
+                <input type="checkbox" id="settings-auto-start">
+                <span>Start with Windows</span>
+              </label>
+            </div>
+          </div>
+
+          <div id="tab-about" class="tab-panel">
+            <div class="about-section">
+              <div class="about-logo">&#127925;</div>
+              <h2>Now Playing</h2>
+              <p class="about-version">Version 1.0.0</p>
+              <p class="about-desc">Display your currently playing Spotify track as an overlay in OBS Studio.</p>
+              
+              <div id="update-banner" class="update-banner hidden">
+                <div class="update-banner-content">
+                  <span id="update-banner-text">A new version is available</span>
+                </div>
+                <button id="btn-install-update" class="btn btn-primary btn-small">Restart to Update</button>
+              </div>
+              
+              <div class="about-actions">
+                <button id="btn-check-updates" class="btn btn-secondary">Check for Updates</button>
+                <span id="update-check-result" class="update-result"></span>
+              </div>
+              
+              <div class="about-links">
+                <p>Built with Electron</p>
+              </div>
+            </div>
+          </div>
+
+          <div id="tab-logs" class="tab-panel">
+            <div class="logs-container">
+              <div class="logs-header">
+                <span>Real-time logs</span>
+                <button id="btn-clear-logs" class="btn btn-ghost btn-small">Clear</button>
+              </div>
+              <div id="log-output" class="log-output"></div>
+            </div>
+          </div>
+        </div>
+
+        <div class="settings-footer">
+          <button id="btn-save-settings" class="btn btn-primary">Save Settings</button>
+        </div>
+      </section>
+      </main>
+    </div>
+  </div>
+
+  <script src="wizard.js"></script>
+</body>
+</html>

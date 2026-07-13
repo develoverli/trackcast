@@ -1,0 +1,88 @@
+{
+  "name": "trackcast",
+  "version": "1.0.0",
+  "description": "Display the currently playing Spotify track as a live overlay in OBS Studio",
+  "main": "src/main.js",
+  "type": "module",
+  "author": {
+    "name": "coldevotion",
+    "email": ""
+  },
+  "license": "MIT",
+  "homepage": "https://github.com/coldevotion/trackcast#readme",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/coldevotion/trackcast.git"
+  },
+  "bugs": {
+    "url": "https://github.com/coldevotion/trackcast/issues"
+  },
+  "keywords": [
+    "spotify",
+    "obs",
+    "obs-studio",
+    "overlay",
+    "now-playing",
+    "streaming",
+    "electron",
+    "obs-websocket"
+  ],
+  "scripts": {
+    "start": "electron .",
+    "dev": "electron . --dev",
+    "build": "electron-builder --win"
+  },
+  "dependencies": {
+    "axios": "^1.7.7",
+    "dotenv": "^16.4.5",
+    "electron-log": "^5.2.4",
+    "electron-updater": "^6.3.9",
+    "obs-websocket-js": "^5.0.6"
+  },
+  "devDependencies": {
+    "electron": "^33.2.1",
+    "electron-builder": "^25.1.8"
+  },
+  "build": {
+    "appId": "com.trackcast.app",
+    "productName": "TrackCast",
+    "copyright": "Copyright © 2026 coldevotion",
+    "directories": {
+      "output": "dist"
+    },
+    "win": {
+      "icon": "build/icon.ico",
+      "publisherName": "coldevotion",
+      "legalTrademarks": "",
+      "target": [
+        {
+          "target": "portable",
+          "arch": ["x64"]
+        }
+      ]
+    },
+    "files": [
+      "src/**/*",
+      "build/icon.ico",
+      "package.json"
+    ],
+    "extraResources": [
+      {
+        "from": "config.json.example",
+        "to": "config.json.example"
+      }
+    ],
+    "publish": {
+      "provider": "github",
+      "owner": "coldevotion",
+      "repo": "trackcast"
+    }
+  },
+  "pnpm": {
+    "onlyBuiltDependencies": [
+      "electron",
+      "electron-builder",
+      "electron-winstaller"
+    ]
+  }
+}

@@ -1,0 +1,36 @@
+{
+  "version": "1.0.0",
+  "spotify": {
+    "clientId": "",
+    "clientSecret": "",
+    "redirectUri": "http://localhost:8888/callback",
+    "refreshToken": "",
+    "accessToken": "",
+    "accessTokenExpiresAt": 0
+  },
+  "obs": {
+    "host": "localhost",
+    "port": 4455,
+    "password": "",
+    "textSourceName": "SpotifyNowPlaying"
+  },
+  "polling": {
+    "intervalMs": 5000,
+    "enabled": true
+  },
+  "overlay": {
+    "format": "\ud83c\udfb5 {trackName} \u2014 {artistName}",
+    "idleText": "",
+    "showOnlyWhenPlaying": true,
+    "showAlbumArt": false
+  },
+  "behavior": {
+    "startMinimized": false,
+    "minimizeToTray": true,
+    "autoStartWithWindows": false,
+    "autoReconnect": true
+  },
+  "setup": {
+    "completed": false
+  }
+}
