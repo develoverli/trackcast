@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline'; img-src 'self' data: https:; connect-src 'self'">
+  <meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline'; img-src 'self' data: https:; connect-src 'self'; frame-src http://127.0.0.1:*">
   <title>TrackCast</title>
   <link rel="stylesheet" href="styles.css">
 </head>
@@ -25,6 +25,11 @@
     <symbol id="i-alert" viewBox="0 0 24 24"><path d="M10.29 3.86 1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z"/><path d="M12 9v4"/><path d="M12 17h.01"/></symbol>
     <symbol id="i-close" viewBox="0 0 24 24"><path d="M18 6 6 18"/><path d="m6 6 12 12"/></symbol>
     <symbol id="i-github" viewBox="0 0 24 24"><path d="M9 19c-5 1.5-5-2.5-7-3m14 6v-3.87a3.37 3.37 0 0 0-.94-2.61c3.14-.35 6.44-1.54 6.44-7A5.44 5.44 0 0 0 20 4.77 5.07 5.07 0 0 0 19.91 1S18.73.65 16 2.48a13.38 13.38 0 0 0-7 0C6.27.65 5.09 1 5.09 1A5.07 5.07 0 0 0 5 4.77a5.44 5.44 0 0 0-1.5 3.78c0 5.42 3.3 6.61 6.44 7A3.37 3.37 0 0 0 9 18.13V22"/></symbol>
+    <symbol id="i-palette" viewBox="0 0 24 24"><path d="M12 22a10 10 0 1 1 10-10c0 2.8-2.2 4-4.5 4H15a2 2 0 0 0-1.4 3.4A1.9 1.9 0 0 1 12 22z"/><circle cx="7.5" cy="10.5" r="1.2"/><circle cx="11" cy="6.8" r="1.2"/><circle cx="16" cy="8" r="1.2"/></symbol>
+    <symbol id="i-more" viewBox="0 0 24 24"><circle cx="12" cy="5" r="1.4"/><circle cx="12" cy="12" r="1.4"/><circle cx="12" cy="19" r="1.4"/></symbol>
+    <symbol id="i-pencil" viewBox="0 0 24 24"><path d="M12 20h9"/><path d="M16.5 3.5a2.1 2.1 0 1 1 3 3L7 19l-4 1 1-4z"/></symbol>
+    <symbol id="i-duplicate" viewBox="0 0 24 24"><rect x="8" y="8" width="13" height="13" rx="2"/><path d="M4 16V5a2 2 0 0 1 2-2h11"/></symbol>
+    <symbol id="i-trash" viewBox="0 0 24 24"><path d="M3 6h18"/><path d="M8 6V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/><path d="M19 6l-1 14a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2L5 6"/></symbol>
     <symbol id="i-wave" viewBox="0 0 24 24"><path d="M3 10v4"/><path d="M7 6v12"/><path d="M11 3v18"/><path d="M15 8v8"/><path d="M19 5v14"/><path d="M23 10v4"/></symbol>
   </svg>
 
@@ -53,6 +58,10 @@
           <button class="sidebar__item is-active" data-view="home" type="button">
             <svg class="icon sidebar__icon" aria-hidden="true"><use href="#i-home"/></svg>
             <span>Home</span>
+          </button>
+          <button class="sidebar__item" data-view="overlay" type="button">
+            <svg class="icon sidebar__icon" aria-hidden="true"><use href="#i-palette"/></svg>
+            <span>Overlay</span>
           </button>
           <button class="sidebar__item" data-view="settings" type="button">
             <svg class="icon sidebar__icon" aria-hidden="true"><use href="#i-settings"/></svg>
@@ -249,7 +258,7 @@
             <header class="step__header">
               <p class="step__eyebrow">Step 2 of 4</p>
               <h1 class="step__title" id="obs-title">Connect OBS</h1>
-              <p class="step__lede">TrackCast sends the track name to a text source in OBS Studio over WebSocket.</p>
+              <p class="step__lede">TrackCast talks to OBS Studio over WebSocket to add and update your overlay.</p>
             </header>
 
             <ol class="tasks">
@@ -283,14 +292,6 @@
                       <button class="btn btn--ghost btn--sm input-group__btn paste-btn" type="button" data-paste-target="obs-password" aria-label="Paste server password"><svg class="icon" aria-hidden="true"><use href="#i-paste"/></svg>Paste</button>
                     </div>
                   </div>
-                  <div class="field">
-                    <label class="field__label" for="obs-source-name">Text source name</label>
-                    <div class="input-group">
-                      <input class="input" type="text" id="obs-source-name" spellcheck="false" placeholder="SpotifyNowPlaying">
-                      <button class="btn btn--ghost btn--sm input-group__btn copy-btn" type="button" data-copy-input="obs-source-name" aria-label="Copy text source name"><svg class="icon" aria-hidden="true"><use href="#i-copy"/></svg><span class="copy-btn__label">Copy</span></button>
-                    </div>
-                    <p class="field__hint">A <strong>Text (GDI+)</strong> source in OBS with this exact name. TrackCast can create it for you after the connection test.</p>
-                  </div>
                   <div class="task__actions">
                     <button id="btn-test-obs" class="btn btn--secondary" type="button">Test connection</button>
                     <span id="obs-test-result" class="test-result" role="status" aria-live="polite"></span>
@@ -298,17 +299,6 @@
                 </div>
               </li>
 
-              <li class="task" id="source-panel" hidden>
-                <span class="task__num" aria-hidden="true">3</span>
-                <div class="task__body">
-                  <h2 class="task__title">Check the text source</h2>
-                  <p class="task__text">Make sure the source exists in OBS so TrackCast can update it.</p>
-                  <div class="task__actions">
-                    <button id="btn-check-source" class="btn btn--secondary btn--sm" type="button">Check if it exists</button>
-                  </div>
-                  <div class="source-result" id="source-result" role="status" aria-live="polite" hidden></div>
-                </div>
-              </li>
             </ol>
 
             <footer class="step__actions">
@@ -321,36 +311,365 @@
           <section id="step-overlay" class="step" aria-labelledby="overlay-title">
             <header class="step__header">
               <p class="step__eyebrow">Step 3 of 4</p>
-              <h1 class="step__title" id="overlay-title">Customize the overlay</h1>
-              <p class="step__lede">Choose how the track appears on stream. You can change this later in Settings.</p>
+              <h1 class="step__title" id="overlay-title">Your stream overlay</h1>
+              <p class="step__lede">Pick a look for your stream, then add it to OBS with one click. You can fine-tune everything later in Overlay.</p>
             </header>
 
-            <div class="panel">
-              <div class="field">
-                <label class="field__label" for="overlay-format">Text format</label>
-                <input class="input" type="text" id="overlay-format" spellcheck="false">
-                <p class="field__hint">Placeholders: <code>{trackName}</code> and <code>{artistName}</code>.</p>
-              </div>
-              <div class="field">
-                <label class="field__label" for="overlay-idle-text">Idle text</label>
-                <input class="input" type="text" id="overlay-idle-text" placeholder="Leave empty to show nothing">
-                <p class="field__hint">Shown when nothing is playing.</p>
-              </div>
-              <label class="toggle">
-                <input class="toggle__input" type="checkbox" id="overlay-show-only-playing" role="switch">
-                <span class="toggle__text">
-                  <span class="toggle__title">Show only while a track is playing</span>
-                  <span class="toggle__hint">Hides the text when Spotify is paused.</span>
-                </span>
-              </label>
-            </div>
+            <div class="editor-slot" id="wizard-overlay-slot">
+              <!-- Overlay editor: one instance, moved between the setup wizard and the Overlay module -->
+              <div class="overlay-editor" id="overlay-editor" data-context="wizard">
+                <fieldset class="choice-group">
+                  <legend class="choice-group__legend">What to send to OBS</legend>
+                  <div class="choice-grid choice-grid--3">
+                    <label class="choice">
+                      <input class="choice__input" type="radio" name="output-mode" value="overlay">
+                      <span class="choice__body">
+                        <span class="choice__title">Browser overlay <span class="choice__badge">Recommended</span></span>
+                        <span class="choice__text">Album art, track, artist and progress. Styled and animated.</span>
+                      </span>
+                    </label>
+                    <label class="choice">
+                      <input class="choice__input" type="radio" name="output-mode" value="text">
+                      <span class="choice__body">
+                        <span class="choice__title">Text source</span>
+                        <span class="choice__text">Plain text in an OBS Text (GDI+) source, styled by TrackCast.</span>
+                      </span>
+                    </label>
+                    <label class="choice">
+                      <input class="choice__input" type="radio" name="output-mode" value="both">
+                      <span class="choice__body">
+                        <span class="choice__title">Both</span>
+                        <span class="choice__text">Update the overlay and the text source at the same time.</span>
+                      </span>
+                    </label>
+                  </div>
+                </fieldset>
 
-            <figure class="obs-preview">
-              <figcaption class="obs-preview__caption">Preview</figcaption>
-              <div class="obs-preview__stage" id="overlay-preview">
-                <span class="obs-preview__text" id="preview-text">Song Title · Artist Name</span>
+                <!-- ═════════════ Browser overlay ═════════════ -->
+                <div class="overlay-editor__section" id="editor-browser">
+                  <div class="overlay-preview">
+                    <div class="overlay-preview__canvas" id="overlay-preview-canvas">
+                      <iframe class="overlay-preview__frame" id="overlay-preview-frame" title="Overlay preview" tabindex="-1"></iframe>
+                    </div>
+                    <p class="overlay-preview__status" id="overlay-preview-status" role="status" aria-live="polite" hidden></p>
+                    <div class="overlay-preview__bar">
+                      <div class="overlay-preview__url">
+                        <span class="overlay-preview__url-label">Overlay URL</span>
+                        <code id="overlay-url">…</code>
+                      </div>
+                      <div class="overlay-preview__actions">
+                        <button class="btn btn--ghost btn--sm copy-btn" type="button" data-copy-target="overlay-url" aria-label="Copy overlay URL"><svg class="icon" aria-hidden="true"><use href="#i-copy"/></svg><span class="copy-btn__label">Copy URL</span></button>
+                        <button class="btn btn--primary btn--sm" id="btn-add-overlay" type="button"><svg class="icon" aria-hidden="true"><use href="#i-monitor"/></svg>Add to OBS</button>
+                      </div>
+                    </div>
+                    <p class="auth-status-text" id="add-overlay-status" role="status" aria-live="polite"></p>
+                  </div>
+
+                  <div class="segmented segmented--tabs" role="tablist" aria-label="Overlay editor" data-scope="module">
+                    <button class="segmented__btn is-active" type="button" role="tab" id="overlay-tab-themes" aria-selected="true" aria-controls="overlay-panel-themes" data-editor-tab="overlay-panel-themes">Themes</button>
+                    <button class="segmented__btn" type="button" role="tab" id="overlay-tab-customize" aria-selected="false" aria-controls="overlay-panel-customize" data-editor-tab="overlay-panel-customize" tabindex="-1">Customize</button>
+                  </div>
+
+                  <div class="editor-panel" id="overlay-panel-themes" role="tabpanel" aria-labelledby="overlay-tab-themes">
+                    <div class="theme-section">
+                      <div class="theme-section__header">
+                        <h3 class="panel__title">Themes</h3>
+                        <p class="field__hint">Colors, fonts and effects. Your layout, corner and texts stay as they are.</p>
+                      </div>
+                      <div class="theme-grid" id="overlay-theme-grid"></div>
+                    </div>
+                    <div class="theme-section" data-scope="module">
+                      <div class="theme-section__header theme-section__header--row">
+                        <h3 class="panel__title">My themes</h3>
+                        <button class="btn btn--secondary btn--sm" id="btn-save-overlay-theme" type="button">Save current as theme</button>
+                      </div>
+                      <div class="theme-grid" id="overlay-custom-grid"></div>
+                      <p class="field__hint" id="overlay-custom-empty">Tweak a theme in Customize, then save it here to reuse it later.</p>
+                    </div>
+                  </div>
+
+                  <div class="editor-panel" id="overlay-panel-customize" role="tabpanel" aria-labelledby="overlay-tab-customize">
+                    <fieldset class="choice-group">
+                      <legend class="choice-group__legend">Layout</legend>
+                      <div class="choice-grid choice-grid--3">
+                        <label class="choice choice--layout">
+                          <input class="choice__input" type="radio" name="overlay-layout" value="card">
+                          <span class="layout-thumb layout-thumb--card" aria-hidden="true"><i></i><b></b></span>
+                          <span class="choice__body"><span class="choice__title">Card</span><span class="choice__text">Art, title, artist and progress.</span></span>
+                        </label>
+                        <label class="choice choice--layout">
+                          <input class="choice__input" type="radio" name="overlay-layout" value="compact">
+                          <span class="layout-thumb layout-thumb--compact" aria-hidden="true"><i></i><b></b></span>
+                          <span class="choice__body"><span class="choice__title">Compact</span><span class="choice__text">A slim pill with mini art.</span></span>
+                        </label>
+                        <label class="choice choice--layout">
+                          <input class="choice__input" type="radio" name="overlay-layout" value="minimal">
+                          <span class="layout-thumb layout-thumb--minimal" aria-hidden="true"><b></b></span>
+                          <span class="choice__body"><span class="choice__title">Minimal</span><span class="choice__text">Just the text.</span></span>
+                        </label>
+                      </div>
+                    </fieldset>
+
+                    <div class="panel">
+                      <h3 class="panel__title">Position and motion</h3>
+                      <div class="field-grid field-grid--even">
+                        <fieldset class="field">
+                          <legend class="field__label">Corner</legend>
+                          <div class="corner-picker">
+                            <label class="corner-picker__cell"><input type="radio" name="overlay-corner" value="top-left" aria-label="Top left"></label>
+                            <label class="corner-picker__cell"><input type="radio" name="overlay-corner" value="top-right" aria-label="Top right"></label>
+                            <label class="corner-picker__cell"><input type="radio" name="overlay-corner" value="bottom-left" aria-label="Bottom left"></label>
+                            <label class="corner-picker__cell"><input type="radio" name="overlay-corner" value="bottom-right" aria-label="Bottom right"></label>
+                          </div>
+                        </fieldset>
+                        <div class="field-stack" data-scope="module">
+                          <div class="field">
+                            <label class="field__label" for="overlay-animation">Entrance animation</label>
+                            <select class="input select" id="overlay-animation">
+                              <option value="slide">Slide in</option>
+                              <option value="fade">Fade in</option>
+                              <option value="none">None</option>
+                            </select>
+                          </div>
+                          <div class="field">
+                            <div class="field__row">
+                              <label class="field__label" for="overlay-scale">Size</label>
+                              <output class="field__value" id="overlay-scale-value" for="overlay-scale">100%</output>
+                            </div>
+                            <input class="range" type="range" id="overlay-scale" min="0.5" max="2" step="0.05">
+                          </div>
+                        </div>
+                      </div>
+                    </div>
+
+                    <div class="panel" data-scope="module">
+                      <h3 class="panel__title">Colors</h3>
+                      <div class="color-grid">
+                        <label class="color-field"><span class="color-field__swatch"><input type="color" id="overlay-accent"></span><span class="color-field__text"><span class="field__label">Accent</span><span class="color-field__hint">Label, icons, progress</span></span></label>
+                        <label class="color-field"><span class="color-field__swatch"><input type="color" id="overlay-accent2"></span><span class="color-field__text"><span class="field__label">Second accent</span><span class="color-field__hint">Gradients</span></span></label>
+                        <label class="color-field"><span class="color-field__swatch"><input type="color" id="overlay-surface-color"></span><span class="color-field__text"><span class="field__label">Background</span><span class="color-field__hint">Card surface</span></span></label>
+                        <label class="color-field"><span class="color-field__swatch"><input type="color" id="overlay-text-color"></span><span class="color-field__text"><span class="field__label">Text</span><span class="color-field__hint">Title and artist</span></span></label>
+                      </div>
+                      <div class="field">
+                        <div class="field__row">
+                          <label class="field__label" for="overlay-surface-opacity">Background opacity</label>
+                          <output class="field__value" id="overlay-surface-opacity-value" for="overlay-surface-opacity">82%</output>
+                        </div>
+                        <input class="range" type="range" id="overlay-surface-opacity" min="0" max="1" step="0.01">
+                      </div>
+                    </div>
+
+                    <div class="panel" data-scope="module">
+                      <h3 class="panel__title">Style</h3>
+                      <div class="field-grid field-grid--even">
+                        <div class="field">
+                          <label class="field__label" for="overlay-font">Font</label>
+                          <select class="input select" id="overlay-font"></select>
+                        </div>
+                        <div class="field">
+                          <label class="field__label" for="overlay-border">Border</label>
+                          <select class="input select" id="overlay-border">
+                            <option value="none">None</option>
+                            <option value="subtle">Subtle</option>
+                            <option value="accent">Accent color</option>
+                            <option value="gradient">Gradient</option>
+                          </select>
+                        </div>
+                        <div class="field">
+                          <label class="field__label" for="overlay-effect">Effect</label>
+                          <select class="input select" id="overlay-effect">
+                            <option value="none">None</option>
+                            <option value="shadow">Soft shadow</option>
+                            <option value="glow">Neon glow</option>
+                            <option value="hard-shadow">Hard offset shadow</option>
+                            <option value="text-shadow">Text shadow only</option>
+                          </select>
+                        </div>
+                        <fieldset class="field">
+                          <legend class="field__label">Corners</legend>
+                          <div class="segmented segmented--full">
+                            <label class="segmented__option"><input type="radio" name="overlay-radius" value="sharp"><span>Sharp</span></label>
+                            <label class="segmented__option"><input type="radio" name="overlay-radius" value="rounded"><span>Rounded</span></label>
+                            <label class="segmented__option"><input type="radio" name="overlay-radius" value="pill"><span>Pill</span></label>
+                          </div>
+                        </fieldset>
+                      </div>
+                      <label class="toggle">
+                        <input class="toggle__input" type="checkbox" id="overlay-uppercase" role="switch">
+                        <span class="toggle__text"><span class="toggle__title">Uppercase song title</span></span>
+                      </label>
+                    </div>
+
+                    <div class="panel panel--list" data-scope="module">
+                      <label class="toggle">
+                        <input class="toggle__input" type="checkbox" id="overlay-show-art" role="switch">
+                        <span class="toggle__text"><span class="toggle__title">Album art</span></span>
+                      </label>
+                      <label class="toggle">
+                        <input class="toggle__input" type="checkbox" id="overlay-show-artist" role="switch">
+                        <span class="toggle__text"><span class="toggle__title">Artist</span></span>
+                      </label>
+                      <label class="toggle">
+                        <input class="toggle__input" type="checkbox" id="overlay-show-album" role="switch">
+                        <span class="toggle__text"><span class="toggle__title">Album name</span></span>
+                      </label>
+                      <label class="toggle">
+                        <input class="toggle__input" type="checkbox" id="overlay-show-progress" role="switch">
+                        <span class="toggle__text"><span class="toggle__title">Progress bar</span><span class="toggle__hint">Card layout only.</span></span>
+                      </label>
+                    </div>
+
+                    <div class="panel" data-scope="module">
+                      <h3 class="panel__title">Text and pauses</h3>
+                      <div class="field-grid field-grid--even">
+                        <div class="field">
+                          <label class="field__label" for="overlay-label-playing">Now playing label</label>
+                          <input class="input" type="text" id="overlay-label-playing" maxlength="40" placeholder="Leave empty to hide">
+                        </div>
+                        <div class="field">
+                          <label class="field__label" for="overlay-label-paused">Paused label</label>
+                          <input class="input" type="text" id="overlay-label-paused" maxlength="40" placeholder="Leave empty to hide">
+                        </div>
+                        <div class="field">
+                          <label class="field__label" for="overlay-when-paused">When music is paused</label>
+                          <select class="input select" id="overlay-when-paused">
+                            <option value="hide">Hide the overlay</option>
+                            <option value="paused">Keep it visible as paused</option>
+                            <option value="idle">Show a custom message</option>
+                          </select>
+                        </div>
+                        <div class="field" id="overlay-idle-field">
+                          <label class="field__label" for="overlay-idle-message">Custom message</label>
+                          <input class="input" type="text" id="overlay-idle-message" maxlength="80" placeholder="Be right back">
+                        </div>
+                      </div>
+                    </div>
+
+                    <details class="disclosure" data-scope="module">
+                      <summary class="disclosure__summary">Advanced</summary>
+                      <div class="panel">
+                        <div class="field">
+                          <label class="field__label" for="overlay-port">Overlay server port</label>
+                          <input class="input input--narrow" type="number" id="overlay-port" min="1024" max="65535">
+                          <p class="field__hint">Change it only if another app already uses this port. After saving, click <strong>Add to OBS</strong> again to update the source URL.</p>
+                        </div>
+                      </div>
+                    </details>
+                  </div>
+                </div>
+
+                <!-- ═════════════ Text source ═════════════ -->
+                <div class="overlay-editor__section" id="editor-text">
+                  <div class="panel">
+                    <h3 class="panel__title">Text source in OBS</h3>
+                    <div class="field">
+                      <label class="field__label" for="obs-source-name">Text source name</label>
+                      <div class="input-group">
+                        <input class="input" type="text" id="obs-source-name" spellcheck="false" placeholder="SpotifyNowPlaying">
+                        <button class="btn btn--ghost btn--sm input-group__btn copy-btn" type="button" data-copy-input="obs-source-name" aria-label="Copy text source name"><svg class="icon" aria-hidden="true"><use href="#i-copy"/></svg><span class="copy-btn__label">Copy</span></button>
+                      </div>
+                    </div>
+                    <div class="task__actions">
+                      <button id="btn-check-source" class="btn btn--secondary btn--sm" type="button">Check or create it in OBS</button>
+                      <button id="btn-apply-text-style" class="btn btn--ghost btn--sm" type="button">Apply style to OBS</button>
+                    </div>
+                    <div class="source-result" id="source-result" role="status" aria-live="polite" hidden></div>
+                    <p class="auth-status-text" id="apply-text-style-status" role="status" aria-live="polite"></p>
+                  </div>
+
+                  <figure class="text-preview">
+                    <figcaption class="obs-preview__caption">Text preview</figcaption>
+                    <div class="text-preview__stage">
+                      <span class="text-preview__sample" id="preview-text">Song Title · Artist Name</span>
+                    </div>
+                  </figure>
+
+                  <div class="theme-section">
+                    <div class="theme-section__header">
+                      <h3 class="panel__title">Text themes</h3>
+                      <p class="field__hint">Uses fonts installed with Windows so OBS can render them.</p>
+                    </div>
+                    <div class="theme-grid theme-grid--text" id="text-theme-grid"></div>
+                  </div>
+
+                  <div class="theme-section" data-scope="module">
+                    <div class="theme-section__header theme-section__header--row">
+                      <h3 class="panel__title">My text themes</h3>
+                      <button class="btn btn--secondary btn--sm" id="btn-save-text-theme" type="button">Save current as theme</button>
+                    </div>
+                    <div class="theme-grid theme-grid--text" id="text-custom-grid"></div>
+                    <p class="field__hint" id="text-custom-empty">Adjust the style below, then save it here to reuse it later.</p>
+                  </div>
+
+                  <div class="panel" data-scope="module">
+                    <h3 class="panel__title">Text style</h3>
+                    <div class="field-grid field-grid--even">
+                      <div class="field">
+                        <label class="field__label" for="text-face">Font</label>
+                        <select class="input select" id="text-face"></select>
+                      </div>
+                      <div class="field">
+                        <label class="field__label" for="text-size">Size (px)</label>
+                        <input class="input" type="number" id="text-size" min="8" max="400">
+                      </div>
+                    </div>
+                    <div class="toggle-row">
+                      <label class="check-chip"><input type="checkbox" id="text-bold"><span>Bold</span></label>
+                      <label class="check-chip"><input type="checkbox" id="text-italic"><span>Italic</span></label>
+                      <label class="check-chip"><input type="checkbox" id="text-uppercase"><span>Uppercase</span></label>
+                    </div>
+                    <div class="color-grid">
+                      <label class="color-field"><span class="color-field__swatch"><input type="color" id="text-color"></span><span class="color-field__text"><span class="field__label">Text color</span></span></label>
+                      <div class="color-field color-field--optional">
+                        <label class="color-field__swatch"><input type="color" id="text-gradient-color" aria-label="Gradient color"></label>
+                        <label class="color-field__text"><span class="field__label">Gradient</span><span class="check-inline"><input type="checkbox" id="text-gradient-on"> Use</span></label>
+                      </div>
+                      <div class="color-field color-field--optional">
+                        <label class="color-field__swatch"><input type="color" id="text-outline-color" aria-label="Outline color"></label>
+                        <label class="color-field__text"><span class="field__label">Outline</span><span class="check-inline"><input type="checkbox" id="text-outline-on"> Use</span></label>
+                      </div>
+                      <label class="color-field"><span class="color-field__swatch"><input type="color" id="text-background-color"></span><span class="color-field__text"><span class="field__label">Background</span></span></label>
+                    </div>
+                    <div class="field-grid field-grid--even">
+                      <div class="field">
+                        <div class="field__row"><label class="field__label" for="text-outline-size">Outline width</label><output class="field__value" id="text-outline-size-value" for="text-outline-size">3</output></div>
+                        <input class="range" type="range" id="text-outline-size" min="1" max="20" step="1">
+                      </div>
+                      <div class="field">
+                        <div class="field__row"><label class="field__label" for="text-background-opacity">Background opacity</label><output class="field__value" id="text-background-opacity-value" for="text-background-opacity">0%</output></div>
+                        <input class="range" type="range" id="text-background-opacity" min="0" max="100" step="1">
+                      </div>
+                      <div class="field">
+                        <div class="field__row"><label class="field__label" for="text-opacity">Text opacity</label><output class="field__value" id="text-opacity-value" for="text-opacity">100%</output></div>
+                        <input class="range" type="range" id="text-opacity" min="0" max="100" step="1">
+                      </div>
+                    </div>
+                  </div>
+
+                  <div class="panel">
+                    <h3 class="panel__title">What it says</h3>
+                    <div class="field">
+                      <label class="field__label" for="overlay-format">Text format</label>
+                      <input class="input" type="text" id="overlay-format" spellcheck="false">
+                      <p class="field__hint">Placeholders: <code>{trackName}</code> and <code>{artistName}</code>.</p>
+                    </div>
+                    <div class="field">
+                      <label class="field__label" for="overlay-idle-text">Idle text</label>
+                      <input class="input" type="text" id="overlay-idle-text" placeholder="Leave empty to show nothing">
+                    </div>
+                    <label class="toggle">
+                      <input class="toggle__input" type="checkbox" id="overlay-show-only-playing" role="switch">
+                      <span class="toggle__text">
+                        <span class="toggle__title">Show only while a track is playing</span>
+                        <span class="toggle__hint">Clears the text when Spotify is paused.</span>
+                      </span>
+                    </label>
+                  </div>
+                </div>
+
+                <p class="field__hint editor-wizard-note" data-scope="wizard">Fine-tune colors, fonts, texts and effects anytime in <strong>Overlay</strong> after setup.</p>
               </div>
-            </figure>
+            </div>
 
             <footer class="step__actions">
               <button id="btn-overlay-back" class="btn btn--ghost" type="button">Back</button>
@@ -496,6 +815,27 @@
           </div>
         </section>
 
+        <!-- Overlay module -->
+        <section id="view-overlay" class="view" hidden aria-labelledby="overlay-view-title">
+          <div class="page">
+            <header class="page__header">
+              <div>
+                <h1 class="page__title" id="overlay-view-title">Overlay</h1>
+                <p class="page__lede">Style what your viewers see in OBS. Changes show in the preview right away.</p>
+              </div>
+            </header>
+            <div class="editor-slot" id="overlay-view-slot"></div>
+            <div class="savebar" id="overlay-savebar" role="region" aria-label="Unsaved overlay changes" hidden>
+              <span class="savebar__text">You have unsaved changes</span>
+              <span class="test-result" id="overlay-save-status" role="status" aria-live="polite"></span>
+              <div class="savebar__actions">
+                <button class="btn btn--ghost" id="btn-overlay-discard" type="button">Discard</button>
+                <button class="btn btn--primary" id="btn-overlay-save" type="button">Save changes</button>
+              </div>
+            </div>
+          </div>
+        </section>
+
         <!-- Help -->
         <section id="view-help" class="view" hidden aria-labelledby="help-title">
           <div class="page">
@@ -524,7 +864,7 @@
                 <ol data-i18n="help.obs.body"></ol>
               </article>
               <article class="help__section">
-                <h2 data-i18n="help.source.title">Step 3 · Add the text source</h2>
+                <h2 data-i18n="help.source.title">Step 3 · Add the overlay to OBS</h2>
                 <p data-i18n="help.source.body"></p>
               </article>
               <article class="help__section">
@@ -555,7 +895,6 @@
             <div class="tabs" role="tablist" aria-label="Settings sections">
               <button class="tab-btn active" id="tabbtn-spotify" data-tab="tab-spotify" type="button" role="tab" aria-selected="true" aria-controls="tab-spotify">Spotify</button>
               <button class="tab-btn" id="tabbtn-obs" data-tab="tab-obs" type="button" role="tab" aria-selected="false" aria-controls="tab-obs" tabindex="-1">OBS</button>
-              <button class="tab-btn" id="tabbtn-overlay" data-tab="tab-overlay" type="button" role="tab" aria-selected="false" aria-controls="tab-overlay" tabindex="-1">Overlay</button>
               <button class="tab-btn" id="tabbtn-behavior" data-tab="tab-behavior" type="button" role="tab" aria-selected="false" aria-controls="tab-behavior" tabindex="-1">Behavior</button>
               <button class="tab-btn" id="tabbtn-about" data-tab="tab-about" type="button" role="tab" aria-selected="false" aria-controls="tab-about" tabindex="-1">About</button>
               <button class="tab-btn" id="tabbtn-logs" data-tab="tab-logs" type="button" role="tab" aria-selected="false" aria-controls="tab-logs" tabindex="-1">Logs</button>
@@ -614,35 +953,10 @@
                     <button class="btn btn--ghost btn--sm input-group__btn reveal-btn" type="button" data-reveal-target="settings-obs-password" aria-label="Show server password" aria-pressed="false"><svg class="icon" aria-hidden="true"><use href="#i-eye"/></svg></button>
                   </div>
                 </div>
-                <div class="field">
-                  <label class="field__label" for="settings-obs-source-name">Text source name</label>
-                  <div class="input-group">
-                    <input class="input" type="text" id="settings-obs-source-name" spellcheck="false">
-                    <button class="btn btn--ghost btn--sm input-group__btn copy-btn" type="button" data-copy-input="settings-obs-source-name" aria-label="Copy text source name"><svg class="icon" aria-hidden="true"><use href="#i-copy"/></svg><span class="copy-btn__label">Copy</span></button>
-                  </div>
-                </div>
                 <div class="panel__footer">
                   <button id="btn-test-obs-settings" class="btn btn--secondary" type="button">Test connection</button>
                   <span id="settings-obs-test-result" class="test-result" role="status" aria-live="polite"></span>
                 </div>
-              </div>
-            </div>
-
-            <div id="tab-overlay" class="tab-panel" role="tabpanel" aria-labelledby="tabbtn-overlay" hidden>
-              <div class="panel">
-                <div class="field">
-                  <label class="field__label" for="settings-overlay-format">Text format</label>
-                  <input class="input" type="text" id="settings-overlay-format" spellcheck="false">
-                  <p class="field__hint">Placeholders: <code>{trackName}</code> and <code>{artistName}</code>.</p>
-                </div>
-                <div class="field">
-                  <label class="field__label" for="settings-overlay-idle-text">Idle text</label>
-                  <input class="input" type="text" id="settings-overlay-idle-text" placeholder="Leave empty to show nothing">
-                </div>
-                <label class="toggle">
-                  <input class="toggle__input" type="checkbox" id="settings-overlay-show-only" role="switch">
-                  <span class="toggle__text"><span class="toggle__title">Show only while a track is playing</span><span class="toggle__hint">Hides the text when Spotify is paused.</span></span>
-                </label>
               </div>
             </div>
 
@@ -725,6 +1039,24 @@
     </div>
   </div>
 
+  <!-- Reusable in-app dialog (never use native alert/confirm/prompt) -->
+  <dialog class="dialog" id="app-dialog" aria-labelledby="app-dialog-title">
+    <form class="dialog__form" method="dialog" id="app-dialog-form">
+      <h2 class="dialog__title" id="app-dialog-title"></h2>
+      <p class="dialog__message" id="app-dialog-message"></p>
+      <div class="field" id="app-dialog-field" hidden>
+        <label class="field__label" for="app-dialog-input" id="app-dialog-label"></label>
+        <input class="input" type="text" id="app-dialog-input" maxlength="40" autocomplete="off">
+        <p class="field__error" id="app-dialog-error" aria-live="polite"></p>
+      </div>
+      <div class="dialog__actions">
+        <button class="btn btn--ghost" type="button" id="app-dialog-cancel">Cancel</button>
+        <button class="btn btn--primary" type="submit" id="app-dialog-confirm">OK</button>
+      </div>
+    </form>
+  </dialog>
+
+  <script src="themes.js"></script>
   <script src="wizard.js"></script>
 </body>
 </html>

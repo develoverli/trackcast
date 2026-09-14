@@ -9,6 +9,11 @@ contextBridge.exposeInMainWorld('api', {
   testOBSConnection: () => ipcRenderer.invoke('test-obs-connection'),
   obsCheckSource: (name) => ipcRenderer.invoke('obs-check-source', name),
   obsCreateSource: (name) => ipcRenderer.invoke('obs-create-source', name),
+  applyTextStyle: () => ipcRenderer.invoke('obs-apply-text-style'),
+
+  // Browser overlay
+  getOverlayStatus: () => ipcRenderer.invoke('overlay-get-status'),
+  addOverlayToOBS: () => ipcRenderer.invoke('overlay-add-to-obs'),
 
   // Polling
   togglePolling: () => ipcRenderer.invoke('toggle-polling'),

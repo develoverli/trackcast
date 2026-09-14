@@ -38,6 +38,7 @@ TrackCast is a local desktop app. Keep in mind:
 
 - `config.json` (`%APPDATA%\TrackCast\config.json`) stores the Spotify client secret, refresh token, and OBS password **in plain text**, protected only by your Windows user account.
 - During authorization, the OAuth callback server listens only on the loopback interface (`http://127.0.0.1:8888/callback`) and validates the OAuth `state` parameter.
+- The OBS browser overlay is served at `http://127.0.0.1:8890/overlay` (port configurable). It listens only on the loopback interface, accepts only `GET` requests, and exposes only what is shown on screen (track, artist, album, album art URL, progress, and overlay style), never credentials.
 - Auto-updates are downloaded from this repository's GitHub Releases.
 
 Issues in Spotify, OBS Studio, or third-party dependencies should be reported to their respective maintainers.

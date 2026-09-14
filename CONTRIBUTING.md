@@ -36,10 +36,13 @@ src/
 ├── preload.mjs        # contextBridge to the renderer (must stay .mjs)
 ├── configManager.js   # config.json load/save
 ├── spotify.js         # Spotify Web API (token refresh, currently-playing)
-├── obs.js             # OBS WebSocket v5 client
+├── obs.js             # OBS WebSocket v5 client (text source + browser overlay source)
+├── overlayServer.js   # Loopback HTTP + Server-Sent Events server for the OBS overlay
+├── overlay/           # Browser overlay page loaded by OBS (HTML/CSS/JS)
 ├── updater.js         # auto-update (electron-updater)
 ├── autoLaunch.js      # Windows startup integration
-└── renderer/          # Wizard + settings UI (HTML/CSS/JS)
+└── renderer/          # Wizard, Home, Overlay, Settings, Help (HTML/CSS/JS)
+    └── themes.js      # Built-in overlay and text source themes
 ```
 
 ## Conventions

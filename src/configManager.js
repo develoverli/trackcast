@@ -24,6 +24,17 @@ export const SPOTIFY_REDIRECT_URI = 'http://127.0.0.1:8888/callback';
 const LOOPBACK_HOST = '127.0.0.1';
 const LEGACY_LOOPBACK_HOST = 'localhost';
 
+export const OUTPUT_MODES = ['overlay', 'text', 'both'];
+export const DEFAULT_OVERLAY_PORT = 8890;
+
+// Maps the pre-theme `browserOverlay.background` setting to the new surface keys.
+const LEGACY_BACKGROUNDS = {
+  dark: { surfaceColor: '#0c100e', surfaceOpacity: 0.82, textColor: '#f4f7f5', effect: 'shadow' },
+  solid: { surfaceColor: '#111613', surfaceOpacity: 1, textColor: '#f4f7f5', effect: 'shadow' },
+  light: { surfaceColor: '#fafbfa', surfaceOpacity: 0.94, textColor: '#141a17', effect: 'shadow' },
+  transparent: { surfaceColor: '#000000', surfaceOpacity: 0, textColor: '#ffffff', effect: 'text-shadow' },
+};
+
 const DEFAULT_CONFIG = {
   version: '1.0.0',
   spotify: {
@@ -42,6 +53,8 @@ const DEFAULT_CONFIG = {
     port: 4455,
     password: '',
     textSourceName: 'SpotifyNowPlaying',
+    // What TrackCast sends to OBS: the browser overlay, the plain text source, or both.
+    outputMode: 'overlay',
   },
   polling: {
     intervalMs: 5000,
@@ -51,6 +64,53 @@ const DEFAULT_CONFIG = {
     format: '\ud83c\udfb5 {trackName} \u2014 {artistName}',
     idleText: '',
     showOnlyWhenPlaying: true,
+    textTheme: 'clean',
+    textStyle: {
+      face: 'Segoe UI',
+      size: 42,
+      bold: true,
+      italic: false,
+      uppercase: false,
+      color: '#ffffff',
+      opacity: 100,
+      gradientColor: null,
+      outlineColor: '#000000',
+      outlineSize: 3,
+      backgroundColor: '#000000',
+      backgroundOpacity: 0,
+    },
+  },
+  browserOverlay: {
+    port: DEFAULT_OVERLAY_PORT,
+    theme: 'trackcast',
+    layout: 'card',
+    accent: '#30e07a',
+    accent2: '#2ec4ce',
+    surfaceColor: '#0c100e',
+    surfaceOpacity: 0.82,
+    textColor: '#f4f7f5',
+    font: 'jakarta',
+    radius: 'rounded',
+    border: 'subtle',
+    effect: 'shadow',
+    uppercaseTitle: false,
+    corner: 'bottom-left',
+    animation: 'slide',
+    scale: 1,
+    showAlbumArt: true,
+    showArtist: true,
+    showAlbum: false,
+    showProgress: true,
+    whenPaused: 'hide',
+    idleMessage: 'Be right back',
+    labels: {
+      nowPlaying: 'Now playing',
+      paused: 'Paused',
+    },
+  },
+  customThemes: {
+    overlay: [],
+    text: [],
   },
   behavior: {
     startMinimized: false,
@@ -78,13 +138,35 @@ export function loadConfig() {
   if (sourcePath) {
     try {
       const raw = readFileSync(sourcePath, 'utf-8');
-      configCache = { ...DEFAULT_CONFIG, ...JSON.parse(raw) };
+      const parsed = JSON.parse(raw);
+      configCache = { ...DEFAULT_CONFIG, ...parsed };
       configCache.spotify = { ...DEFAULT_CONFIG.spotify, ...configCache.spotify };
       configCache.obs = { ...DEFAULT_CONFIG.obs, ...configCache.obs };
       configCache.polling = { ...DEFAULT_CONFIG.polling, ...configCache.polling };
-      configCache.overlay = { ...DEFAULT_CONFIG.overlay, ...configCache.overlay };
+      configCache.overlay = {
+        ...DEFAULT_CONFIG.overlay,
+        ...configCache.overlay,
+        textStyle: { ...DEFAULT_CONFIG.overlay.textStyle, ...configCache.overlay?.textStyle },
+      };
+      configCache.customThemes = {
+        overlay: Array.isArray(parsed.customThemes?.overlay) ? parsed.customThemes.overlay : [],
+        text: Array.isArray(parsed.customThemes?.text) ? parsed.customThemes.text : [],
+      };
+      configCache.browserOverlay = {
+        ...DEFAULT_CONFIG.browserOverlay,
+        ...configCache.browserOverlay,
+        ...LEGACY_BACKGROUNDS[parsed.browserOverlay?.background],
+        ...pickDefined(parsed.browserOverlay, ['surfaceColor', 'surfaceOpacity', 'textColor', 'effect']),
+        labels: { ...DEFAULT_CONFIG.browserOverlay.labels, ...configCache.browserOverlay?.labels },
+      };
+      delete configCache.browserOverlay.background;
       configCache.behavior = { ...DEFAULT_CONFIG.behavior, ...configCache.behavior };
       configCache.setup = { ...DEFAULT_CONFIG.setup, ...configCache.setup };
+
+      // Installations set up before the browser overlay existed keep using the text source.
+      if (!parsed.obs?.outputMode && configCache.setup.completed) {
+        configCache.obs.outputMode = 'text';
+      }
 
       if (migrateLocalhostRedirectUri(configCache)) {
         try {
@@ -124,6 +206,14 @@ export function updateConfig(partial) {
 
 export function getConfig() {
   return loadConfig();
+}
+
+function pickDefined(source, keys) {
+  const picked = {};
+  for (const key of keys) {
+    if (source && source[key] !== undefined) picked[key] = source[key];
+  }
+  return picked;
 }
 
 function migrateLocalhostRedirectUri(config) {

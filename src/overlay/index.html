@@ -1,0 +1,34 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self'; style-src 'self'; img-src 'self' https://i.scdn.co data:; font-src 'self'; connect-src 'self'">
+  <title>TrackCast Overlay</title>
+  <link rel="stylesheet" href="/overlay/overlay.css">
+</head>
+<body>
+  <div class="stage" id="stage" data-corner="bottom-left">
+    <article class="widget" id="widget" data-layout="card" data-background="dark" data-animation="slide" data-font="jakarta" data-visible="false" aria-live="polite">
+      <div class="widget__art">
+        <img class="widget__img" id="art" alt="">
+        <svg class="widget__art-fallback" viewBox="0 0 24 24" aria-hidden="true"><path d="M9 18V5l12-2v13"/><circle cx="6" cy="18" r="3"/><circle cx="18" cy="16" r="3"/></svg>
+      </div>
+      <div class="widget__body" id="body">
+        <p class="widget__label">
+          <span class="eq" aria-hidden="true"><i></i><i></i><i></i><i></i></span>
+          <span class="widget__label-text" id="label"></span>
+        </p>
+        <p class="widget__title" id="title"></p>
+        <p class="widget__meta">
+          <span class="widget__artist" id="artist"></span>
+          <span class="widget__album" id="album"></span>
+        </p>
+        <div class="widget__progress" id="progress"><div class="widget__progress-fill" id="progress-fill"></div></div>
+      </div>
+    </article>
+  </div>
+
+  <script src="/overlay/overlay.js"></script>
+</body>
+</html>

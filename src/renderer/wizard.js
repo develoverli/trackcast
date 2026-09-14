@@ -121,10 +121,13 @@ function openAppShell() {
     enableAppShell();
     setupSidebarListeners();
     setupHelpLanguageToggle();
+    setupOverlayEditor();
     loadSettingsValues();
     setupSettingsListeners();
     setupRedirectUriNotice();
   }
+  mountOverlayEditor('overlay-view-slot', 'module');
+  loadOverlayEditor();
   showView('home');
   updatePollingLabel(config.polling.enabled !== false);
   window.api.getCurrentTrack().then((track) => renderNowPlaying(track));
@@ -151,14 +154,14 @@ const HELP_I18N = {
     'help.spotify.body': '<li>Go to <strong>developer.spotify.com/dashboard</strong> and sign in with your Spotify account.</li><li>Click <strong>Create app</strong>. Name and description can be anything.</li><li>In <strong>Redirect URIs</strong> add exactly: <code>http://127.0.0.1:8888/callback</code></li><li>Save. Open the app, then click <strong>Settings</strong> to copy your Client ID and Client Secret.</li>',
     'help.obs.title': 'Step 2 · Enable OBS WebSocket',
     'help.obs.body': '<li>Open OBS Studio.</li><li>Top menu: <strong>Tools → WebSocket Server Settings</strong>.</li><li>Check <strong>Enable WebSocket server</strong>.</li><li>Set a server password and note it down. Default port is <code>4455</code>.</li><li>Click OK.</li>',
-    'help.source.title': 'Step 3 · Add the text source',
-    'help.source.body': 'In the OBS step of the wizard, after the connection test passes, click "Check if it exists". If the source does not exist yet, the app can create it for you in the current scene. You can then drag, resize, and style it from inside OBS.',
+    'help.source.title': 'Step 3 · Add the overlay to OBS',
+    'help.source.body': 'In step 3 of the wizard, or in the Overlay module, choose Browser overlay, pick a layout and click "Add to OBS". TrackCast creates a "TrackCast Overlay" browser source in your current scene that covers the whole canvas, so you never need to resize it. Prefer plain text? Choose Text source and click "Check or create it in OBS".',
     'help.format.title': 'Customizing the overlay text',
     'help.format.intro': 'The format field accepts two placeholders:',
     'help.format.list': '<li><code>{trackName}</code> &mdash; current track title</li><li><code>{artistName}</code> &mdash; artist or comma-separated artists</li>',
     'help.format.example': 'Example: <code>♫ {trackName} by {artistName}</code>',
     'help.troubleshoot.title': 'Troubleshooting',
-    'help.troubleshoot.body': '<dt>OBS source does not update</dt><dd>Confirm the source name in OBS matches the one configured in the app exactly, including capitalization.</dd><dt>OBS connection fails</dt><dd>Check that OBS WebSocket is enabled, the password matches, and Windows Firewall is not blocking port 4455.</dd><dt>Spotify authorization fails</dt><dd>Verify the redirect URI in your Spotify Developer dashboard is exactly <code>http://127.0.0.1:8888/callback</code>, no trailing slash.</dd><dt>"Token expired" keeps appearing</dt><dd>The app auto-refreshes tokens 5 minutes before expiry. If errors persist, go to Settings → Spotify and re-authorize.</dd><dt>App icon stays grey in tray</dt><dd>Polling is paused, no Spotify track is playing, or the Spotify connection dropped. Resume polling from the sidebar footer.</dd>',
+    'help.troubleshoot.body': '<dt>The overlay does not appear in OBS</dt><dd>Keep TrackCast running, check that the Browser Source URL matches the one in the Overlay module, and click "Add to OBS" again after changing the overlay port. With "When music is paused" set to Hide, the overlay only shows while a song plays.</dd><dt>OBS source does not update</dt><dd>Confirm the source name in OBS matches the one configured in the app exactly, including capitalization.</dd><dt>OBS connection fails</dt><dd>Check that OBS WebSocket is enabled, the password matches, and Windows Firewall is not blocking port 4455.</dd><dt>Spotify authorization fails</dt><dd>Verify the redirect URI in your Spotify Developer dashboard is exactly <code>http://127.0.0.1:8888/callback</code>, no trailing slash.</dd><dt>"Token expired" keeps appearing</dt><dd>The app auto-refreshes tokens 5 minutes before expiry. If errors persist, go to Settings → Spotify and re-authorize.</dd><dt>App icon stays grey in tray</dt><dd>Polling is paused, no Spotify track is playing, or the Spotify connection dropped. Resume polling from the sidebar footer.</dd>',
     'help.logs.title': 'Logs & reporting bugs',
     'help.logs.body': 'Detailed logs are stored at <code>%APPDATA%\\TrackCast\\logs\\main.log</code>. Include the last 100 lines when reporting an issue on GitHub.',
   },
@@ -171,14 +174,14 @@ const HELP_I18N = {
     'help.spotify.body': '<li>Andá a <strong>developer.spotify.com/dashboard</strong> e iniciá sesión con tu cuenta de Spotify.</li><li>Hacé clic en <strong>Create app</strong>. Nombre y descripción pueden ser cualquier cosa.</li><li>En <strong>Redirect URIs</strong> agregá exactamente: <code>http://127.0.0.1:8888/callback</code></li><li>Guardá. Abrí la app y entrá en <strong>Settings</strong> para copiar Client ID y Client Secret.</li>',
     'help.obs.title': 'Paso 2 · Habilitar OBS WebSocket',
     'help.obs.body': '<li>Abrí OBS Studio.</li><li>Menú superior: <strong>Tools → WebSocket Server Settings</strong>.</li><li>Marcá <strong>Enable WebSocket server</strong>.</li><li>Definí un password de servidor y anotalo. El puerto por defecto es <code>4455</code>.</li><li>Clic en OK.</li>',
-    'help.source.title': 'Paso 3 · Agregar el text source',
-    'help.source.body': 'En el paso OBS del wizard, después de que la prueba de conexión pasa, hacé clic en "Check if it exists". Si el source todavía no existe, la app lo puede crear por vos en la scene actual. Después lo movés, redimensionás y estilizás desde adentro de OBS.',
+    'help.source.title': 'Paso 3 · Agregar el overlay a OBS',
+    'help.source.body': 'En el paso 3 del wizard, o en el módulo Overlay, elegí Browser overlay, un layout y hacé clic en "Add to OBS". TrackCast crea un browser source "TrackCast Overlay" en la escena actual que cubre todo el lienzo, así que no hace falta redimensionarlo. ¿Preferís texto plano? Elegí Text source y hacé clic en "Check or create it in OBS".',
     'help.format.title': 'Personalizar el texto del overlay',
     'help.format.intro': 'El campo de formato acepta dos placeholders:',
     'help.format.list': '<li><code>{trackName}</code> &mdash; título del track actual</li><li><code>{artistName}</code> &mdash; artista o artistas separados por coma</li>',
     'help.format.example': 'Ejemplo: <code>♫ {trackName} por {artistName}</code>',
     'help.troubleshoot.title': 'Solución de problemas',
-    'help.troubleshoot.body': '<dt>El source de OBS no se actualiza</dt><dd>Confirmá que el nombre del source en OBS coincide exactamente con el configurado en la app, mayúsculas incluidas.</dd><dt>Falla la conexión a OBS</dt><dd>Verificá que OBS WebSocket esté habilitado, que el password coincida, y que el Firewall de Windows no esté bloqueando el puerto 4455.</dd><dt>Falla la autorización de Spotify</dt><dd>Verificá que el redirect URI en tu Spotify Developer dashboard sea exactamente <code>http://127.0.0.1:8888/callback</code>, sin slash al final.</dd><dt>Aparece "Token expired" todo el tiempo</dt><dd>La app refresca tokens automáticamente 5 minutos antes de que expiren. Si persiste, andá a Settings → Spotify y re-autorizá.</dd><dt>El ícono del tray queda gris</dt><dd>El polling está pausado, no hay track sonando en Spotify, o se cayó la conexión. Reanudá el polling desde el footer del sidebar.</dd>',
+    'help.troubleshoot.body': '<dt>El overlay no aparece en OBS</dt><dd>Dejá TrackCast abierto, verificá que la URL del Browser Source coincida con la del módulo Overlay y hacé clic en "Add to OBS" otra vez si cambiaste el puerto. Con "When music is paused" en Hide, el overlay solo se ve mientras suena una canción.</dd><dt>El source de OBS no se actualiza</dt><dd>Confirmá que el nombre del source en OBS coincide exactamente con el configurado en la app, mayúsculas incluidas.</dd><dt>Falla la conexión a OBS</dt><dd>Verificá que OBS WebSocket esté habilitado, que el password coincida, y que el Firewall de Windows no esté bloqueando el puerto 4455.</dd><dt>Falla la autorización de Spotify</dt><dd>Verificá que el redirect URI en tu Spotify Developer dashboard sea exactamente <code>http://127.0.0.1:8888/callback</code>, sin slash al final.</dd><dt>Aparece "Token expired" todo el tiempo</dt><dd>La app refresca tokens automáticamente 5 minutos antes de que expiren. Si persiste, andá a Settings → Spotify y re-autorizá.</dd><dt>El ícono del tray queda gris</dt><dd>El polling está pausado, no hay track sonando en Spotify, o se cayó la conexión. Reanudá el polling desde el footer del sidebar.</dd>',
     'help.logs.title': 'Logs y reportar bugs',
     'help.logs.body': 'Los logs detallados están en <code>%APPDATA%\\TrackCast\\logs\\main.log</code>. Adjuntá las últimas 100 líneas cuando reportes un bug en GitHub.',
   },
@@ -314,7 +317,6 @@ function setupWizardListeners() {
   });
 
   document.getElementById('btn-test-obs').addEventListener('click', testOBSConnection);
-  setupSourceCheckListeners();
 
   document.getElementById('btn-obs-next').addEventListener('click', () => {
     saveOBSConfig();
@@ -326,12 +328,9 @@ function setupWizardListeners() {
     showStep('obs');
   });
 
-  document.getElementById('overlay-format').addEventListener('input', updateOverlayPreview);
-  document.getElementById('overlay-idle-text').addEventListener('input', updateOverlayPreview);
-  document.getElementById('overlay-show-only-playing').addEventListener('change', updateOverlayPreview);
-
-  document.getElementById('btn-overlay-next').addEventListener('click', () => {
-    saveOverlayConfig();
+  document.getElementById('btn-overlay-next').addEventListener('click', async () => {
+    applyOverlayEditorToConfig(config);
+    await window.api.saveConfig(config);
     showStep('behavior');
   });
 
@@ -386,14 +385,12 @@ function initOBSStep() {
   document.getElementById('obs-host').value = config.obs.host;
   document.getElementById('obs-port').value = config.obs.port;
   document.getElementById('obs-password').value = config.obs.password;
-  document.getElementById('obs-source-name').value = config.obs.textSourceName;
 }
 
 function initOverlayStep() {
-  document.getElementById('overlay-format').value = config.overlay.format;
-  document.getElementById('overlay-idle-text').value = config.overlay.idleText;
-  document.getElementById('overlay-show-only-playing').checked = config.overlay.showOnlyWhenPlaying;
-  updateOverlayPreview();
+  setupOverlayEditor();
+  mountOverlayEditor('wizard-overlay-slot', 'wizard');
+  loadOverlayEditor();
 }
 
 function initBehaviorStep() {
@@ -413,13 +410,6 @@ function saveOBSConfig() {
   config.obs.host = document.getElementById('obs-host').value;
   config.obs.port = parseInt(document.getElementById('obs-port').value, 10);
   config.obs.password = document.getElementById('obs-password').value;
-  config.obs.textSourceName = document.getElementById('obs-source-name').value;
-}
-
-function saveOverlayConfig() {
-  config.overlay.format = document.getElementById('overlay-format').value;
-  config.overlay.idleText = document.getElementById('overlay-idle-text').value;
-  config.overlay.showOnlyWhenPlaying = document.getElementById('overlay-show-only-playing').checked;
 }
 
 function saveBehaviorConfig() {
@@ -697,8 +687,6 @@ async function testOBSConnection() {
     if (result.success) {
       resultEl.textContent = 'Connected!';
       resultEl.className = 'test-result success';
-      const panel = document.getElementById('source-panel');
-      if (panel) panel.hidden = false;
     } else {
       resultEl.textContent = 'Failed: ' + result.error;
       resultEl.className = 'test-result error';
@@ -716,10 +704,6 @@ async function testOBSConnection() {
 // OBS Text source check + auto-create
 // ─────────────────────────────────────────────────────────────
 
-function setupSourceCheckListeners() {
-  const checkBtn = document.getElementById('btn-check-source');
-  if (checkBtn) checkBtn.addEventListener('click', handleSourceCheck);
-}
 
 async function handleSourceCheck() {
   const btn = document.getElementById('btn-check-source');
@@ -738,7 +722,7 @@ async function handleSourceCheck() {
 
   const response = await window.api.obsCheckSource(sourceName);
   btn.disabled = false;
-  btn.textContent = 'Check if it exists';
+  btn.textContent = 'Check or create it in OBS';
 
   renderSourceResult(response, sourceName);
 }
@@ -803,6 +787,8 @@ function renderSourceResult(data, sourceName) {
 async function handleSourceCreate(sourceName) {
   const btn = document.getElementById('btn-create-source');
   if (btn) { btn.disabled = true; btn.textContent = 'Creating…'; }
+  // Save the chosen output mode and text style so OBS gets them and starts receiving updates.
+  await persistOverlayEditor();
   const response = await window.api.obsCreateSource(sourceName);
   if (btn) { btn.disabled = false; }
 
@@ -817,19 +803,678 @@ async function handleSourceCreate(sourceName) {
 // Overlay Preview
 // ─────────────────────────────────────────────────────────────
 
-function updateOverlayPreview() {
-  const format = document.getElementById('overlay-format').value;
-  const idleText = document.getElementById('overlay-idle-text').value;
-  const showOnlyPlaying = document.getElementById('overlay-show-only-playing').checked;
-  
-  const previewText = document.getElementById('preview-text');
-  
-  if (showOnlyPlaying || !idleText) {
-    previewText.textContent = format
-      .replace('{trackName}', 'Song Title')
-      .replace('{artistName}', 'Artist Name');
+
+// ─────────────────────────────────────────────────────────────
+// Overlay editor (shared by wizard step 3 and the Overlay module)
+// ─────────────────────────────────────────────────────────────
+
+const OVERLAY_CANVAS_WIDTH = 1920;
+const OVERLAY_STYLE_MESSAGE = 'trackcast:overlay-style';
+const HEX_COLOR_PATTERN = /^#[0-9a-f]{6}$/i;
+const THEME_NAME_MAX = 40;
+const SAMPLE_TRACK = { title: 'Bad Habit', artist: 'Steve Lacy' };
+const {
+  OVERLAY_FONTS, OVERLAY_THEME_KEYS, OVERLAY_THEMES, TEXT_THEME_KEYS, TEXT_THEMES, TEXT_FACES,
+} = window.TrackCastThemes;
+
+let overlayEditorReady = false;
+let overlayStatus = null;
+let overlayDirty = false;
+let editorLoading = false;
+let activeOverlayTheme = null;
+let activeTextTheme = null;
+
+function byId(id) {
+  return document.getElementById(id);
+}
+
+function checkedValue(name) {
+  const input = document.querySelector(`input[name="${name}"]:checked`);
+  return input ? input.value : null;
+}
+
+function setChecked(name, value) {
+  document.querySelectorAll(`input[name="${name}"]`).forEach((input) => {
+    input.checked = input.value === value;
+  });
+}
+
+function safeHex(value, fallback) {
+  return HEX_COLOR_PATTERN.test(value || '') ? value : fallback;
+}
+
+function hexToRgba(hex, alpha) {
+  const n = parseInt(hex.slice(1), 16);
+  return `rgba(${(n >> 16) & 255}, ${(n >> 8) & 255}, ${n & 255}, ${alpha})`;
+}
+
+function sameValues(a, b, keys) {
+  return keys.every((key) => String(a[key]) === String(b[key]));
+}
+
+// escapeHtml() does not escape quotes; use this for attribute values.
+function escapeAttr(value) {
+  return String(value)
+    .replace(/&/g, '&amp;')
+    .replace(/"/g, '&quot;')
+    .replace(/'/g, '&#39;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;');
+}
+
+function newThemeId() {
+  return `custom-${Date.now().toString(36)}`;
+}
+
+// ── In-app dialog ────────────────────────────────────────────
+
+const appDialog = (() => {
+  let resolver = null;
+  let mode = 'confirm';
+
+  function open({ title, message = '', label = '', value = '', confirmText = 'OK', danger = false, prompt = false }) {
+    const dialog = byId('app-dialog');
+    mode = prompt ? 'prompt' : 'confirm';
+    byId('app-dialog-title').textContent = title;
+    byId('app-dialog-message').textContent = message;
+    byId('app-dialog-message').hidden = !message;
+    byId('app-dialog-field').hidden = !prompt;
+    byId('app-dialog-label').textContent = label;
+    byId('app-dialog-input').value = value;
+    byId('app-dialog-error').textContent = '';
+    const confirm = byId('app-dialog-confirm');
+    confirm.textContent = confirmText;
+    confirm.classList.toggle('btn--danger', danger);
+    confirm.classList.toggle('btn--primary', !danger);
+    dialog.showModal();
+    if (prompt) byId('app-dialog-input').select();
+    else byId('app-dialog-cancel').focus();
+    return new Promise((resolve) => { resolver = resolve; });
+  }
+
+  function close(result) {
+    byId('app-dialog').close();
+    if (resolver) resolver(result);
+    resolver = null;
+  }
+
+  function setup() {
+    byId('app-dialog-cancel').addEventListener('click', () => close(mode === 'prompt' ? null : false));
+    byId('app-dialog').addEventListener('cancel', (event) => {
+      event.preventDefault();
+      close(mode === 'prompt' ? null : false);
+    });
+    byId('app-dialog-form').addEventListener('submit', (event) => {
+      event.preventDefault();
+      if (mode === 'prompt') {
+        const value = byId('app-dialog-input').value.trim();
+        if (!value) {
+          byId('app-dialog-error').textContent = 'Enter a name.';
+          return;
+        }
+        close(value.slice(0, THEME_NAME_MAX));
+      } else {
+        close(true);
+      }
+    });
+  }
+
+  return {
+    setup,
+    confirm: (options) => open({ ...options, prompt: false }),
+    prompt: (options) => open({ ...options, prompt: true }),
+  };
+})();
+
+// ── Mounting and visibility ──────────────────────────────────
+
+function mountOverlayEditor(slotId, context) {
+  const editor = byId('overlay-editor');
+  const slot = byId(slotId);
+  if (!editor || !slot) return;
+  if (editor.parentElement !== slot) slot.appendChild(editor);
+  editor.dataset.context = context;
+  if (context === 'wizard') {
+    byId('overlay-panel-themes').hidden = false;
+    byId('overlay-panel-customize').hidden = false;
   } else {
-    previewText.textContent = idleText;
+    selectEditorTab(document.querySelector('[data-editor-tab].is-active') || byId('overlay-tab-themes'));
+  }
+}
+
+function selectEditorTab(tab) {
+  document.querySelectorAll('[data-editor-tab]').forEach((button) => {
+    const selected = button === tab;
+    button.classList.toggle('is-active', selected);
+    button.setAttribute('aria-selected', String(selected));
+    button.tabIndex = selected ? 0 : -1;
+    byId(button.dataset.editorTab).hidden = !selected;
+  });
+}
+
+function updateEditorVisibility() {
+  const mode = checkedValue('output-mode') || 'overlay';
+  byId('editor-browser').hidden = mode === 'text';
+  byId('editor-text').hidden = mode === 'overlay';
+  byId('overlay-idle-field').hidden = byId('overlay-when-paused').value !== 'idle';
+  byId('overlay-scale-value').textContent = `${Math.round(Number(byId('overlay-scale').value) * 100)}%`;
+  byId('overlay-surface-opacity-value').textContent = `${Math.round(Number(byId('overlay-surface-opacity').value) * 100)}%`;
+  byId('text-outline-size-value').textContent = byId('text-outline-size').value;
+  byId('text-background-opacity-value').textContent = `${byId('text-background-opacity').value}%`;
+  byId('text-opacity-value').textContent = `${byId('text-opacity').value}%`;
+  byId('text-gradient-color').disabled = !byId('text-gradient-on').checked;
+  byId('text-outline-color').disabled = !byId('text-outline-on').checked;
+  byId('text-outline-size').disabled = !byId('text-outline-on').checked;
+}
+
+// ── Setup ────────────────────────────────────────────────────
+
+function setupOverlayEditor() {
+  if (overlayEditorReady) return;
+  overlayEditorReady = true;
+
+  appDialog.setup();
+
+  byId('overlay-font').innerHTML = OVERLAY_FONTS
+    .map((font) => `<option value="${font.id}">${escapeHtml(font.label)}</option>`).join('');
+  byId('text-face').innerHTML = TEXT_FACES
+    .map((face) => `<option value="${escapeAttr(face)}">${escapeHtml(face)}</option>`).join('');
+
+  const editor = byId('overlay-editor');
+  const onEdit = () => {
+    if (editorLoading) return;
+    updateEditorVisibility();
+    updateOverlayPreview();
+    sendOverlayPreviewStyle();
+    refreshThemeSelection();
+    markOverlayDirty();
+  };
+  editor.addEventListener('input', onEdit);
+  editor.addEventListener('change', onEdit);
+
+  document.querySelectorAll('[data-editor-tab]').forEach((tab, index, tabs) => {
+    tab.addEventListener('click', () => selectEditorTab(tab));
+    tab.addEventListener('keydown', (event) => {
+      if (event.key !== 'ArrowRight' && event.key !== 'ArrowLeft') return;
+      const next = tabs[(index + (event.key === 'ArrowRight' ? 1 : tabs.length - 1)) % tabs.length];
+      selectEditorTab(next);
+      next.focus();
+    });
+  });
+
+  byId('overlay-preview-frame').addEventListener('load', sendOverlayPreviewStyle);
+  byId('btn-add-overlay').addEventListener('click', addOverlayToObs);
+  byId('btn-check-source').addEventListener('click', handleSourceCheck);
+  byId('btn-apply-text-style').addEventListener('click', applyTextStyleToObs);
+  byId('btn-save-overlay-theme').addEventListener('click', () => saveCurrentAsTheme('overlay'));
+  byId('btn-save-text-theme').addEventListener('click', () => saveCurrentAsTheme('text'));
+  byId('btn-overlay-save').addEventListener('click', saveOverlayModule);
+  byId('btn-overlay-discard').addEventListener('click', discardOverlayChanges);
+
+  new ResizeObserver(() => fitOverlayPreview()).observe(byId('overlay-preview-canvas'));
+}
+
+// ── Load / collect ───────────────────────────────────────────
+
+function loadOverlayEditor() {
+  editorLoading = true;
+  const overlay = config.browserOverlay;
+  const textStyle = config.overlay.textStyle;
+
+  setChecked('output-mode', config.obs.outputMode || 'overlay');
+  setChecked('overlay-layout', overlay.layout);
+  setChecked('overlay-corner', overlay.corner);
+  byId('overlay-animation').value = overlay.animation;
+  byId('overlay-scale').value = overlay.scale;
+  applyOverlayThemeStyleToControls(overlay);
+  byId('overlay-show-art').checked = overlay.showAlbumArt;
+  byId('overlay-show-artist').checked = overlay.showArtist;
+  byId('overlay-show-album').checked = overlay.showAlbum;
+  byId('overlay-show-progress').checked = overlay.showProgress;
+  byId('overlay-label-playing').value = overlay.labels.nowPlaying;
+  byId('overlay-label-paused').value = overlay.labels.paused;
+  byId('overlay-when-paused').value = overlay.whenPaused;
+  byId('overlay-idle-message').value = overlay.idleMessage;
+  byId('overlay-port').value = overlay.port;
+
+  byId('obs-source-name').value = config.obs.textSourceName;
+  byId('overlay-format').value = config.overlay.format;
+  byId('overlay-idle-text').value = config.overlay.idleText;
+  byId('overlay-show-only-playing').checked = config.overlay.showOnlyWhenPlaying;
+  byId('text-size').value = textStyle.size;
+  applyTextThemeStyleToControls(textStyle);
+
+  activeOverlayTheme = overlay.theme || null;
+  activeTextTheme = config.overlay.textTheme || null;
+  editorLoading = false;
+
+  updateEditorVisibility();
+  renderThemeGalleries();
+  updateOverlayPreview();
+  setOverlayDirty(false);
+  refreshOverlayStatus();
+}
+
+function applyOverlayThemeStyleToControls(style) {
+  byId('overlay-accent').value = safeHex(style.accent, '#30e07a');
+  byId('overlay-accent2').value = safeHex(style.accent2, style.accent);
+  byId('overlay-surface-color').value = safeHex(style.surfaceColor, '#0c100e');
+  byId('overlay-surface-opacity').value = style.surfaceOpacity;
+  byId('overlay-text-color').value = safeHex(style.textColor, '#f4f7f5');
+  byId('overlay-font').value = style.font;
+  byId('overlay-border').value = style.border;
+  byId('overlay-effect').value = style.effect;
+  setChecked('overlay-radius', style.radius);
+  byId('overlay-uppercase').checked = Boolean(style.uppercaseTitle);
+}
+
+function applyTextThemeStyleToControls(style) {
+  byId('text-face').value = style.face;
+  byId('text-bold').checked = style.bold;
+  byId('text-italic').checked = style.italic;
+  byId('text-uppercase').checked = style.uppercase;
+  byId('text-color').value = safeHex(style.color, '#ffffff');
+  byId('text-opacity').value = style.opacity;
+  byId('text-gradient-on').checked = Boolean(style.gradientColor);
+  byId('text-gradient-color').value = safeHex(style.gradientColor, '#ff8a00');
+  byId('text-outline-on').checked = Boolean(style.outlineColor && style.outlineSize > 0);
+  byId('text-outline-color').value = safeHex(style.outlineColor, '#000000');
+  byId('text-outline-size').value = style.outlineSize || 3;
+  byId('text-background-color').value = safeHex(style.backgroundColor, '#000000');
+  byId('text-background-opacity').value = style.backgroundOpacity;
+}
+
+function collectOverlayThemeStyle() {
+  return {
+    accent: byId('overlay-accent').value,
+    accent2: byId('overlay-accent2').value,
+    surfaceColor: byId('overlay-surface-color').value,
+    surfaceOpacity: Number(byId('overlay-surface-opacity').value),
+    textColor: byId('overlay-text-color').value,
+    font: byId('overlay-font').value,
+    radius: checkedValue('overlay-radius') || 'rounded',
+    border: byId('overlay-border').value,
+    effect: byId('overlay-effect').value,
+    uppercaseTitle: byId('overlay-uppercase').checked,
+  };
+}
+
+function collectTextThemeStyle() {
+  const outlineOn = byId('text-outline-on').checked;
+  return {
+    face: byId('text-face').value,
+    bold: byId('text-bold').checked,
+    italic: byId('text-italic').checked,
+    uppercase: byId('text-uppercase').checked,
+    color: byId('text-color').value,
+    opacity: Number(byId('text-opacity').value),
+    gradientColor: byId('text-gradient-on').checked ? byId('text-gradient-color').value : null,
+    outlineColor: outlineOn ? byId('text-outline-color').value : null,
+    outlineSize: outlineOn ? Number(byId('text-outline-size').value) : 0,
+    backgroundColor: byId('text-background-color').value,
+    backgroundOpacity: Number(byId('text-background-opacity').value),
+  };
+}
+
+function collectOverlayStyle() {
+  const port = parseInt(byId('overlay-port').value, 10);
+  return {
+    port: Number.isInteger(port) && port >= 1024 && port <= 65535 ? port : config.browserOverlay.port,
+    theme: activeOverlayTheme,
+    layout: checkedValue('overlay-layout') || 'card',
+    corner: checkedValue('overlay-corner') || 'bottom-left',
+    animation: byId('overlay-animation').value,
+    scale: Number(byId('overlay-scale').value),
+    ...collectOverlayThemeStyle(),
+    showAlbumArt: byId('overlay-show-art').checked,
+    showArtist: byId('overlay-show-artist').checked,
+    showAlbum: byId('overlay-show-album').checked,
+    showProgress: byId('overlay-show-progress').checked,
+    whenPaused: byId('overlay-when-paused').value,
+    idleMessage: byId('overlay-idle-message').value.trim(),
+    labels: {
+      nowPlaying: byId('overlay-label-playing').value.trim(),
+      paused: byId('overlay-label-paused').value.trim(),
+    },
+  };
+}
+
+function applyOverlayEditorToConfig(target) {
+  const textSize = parseInt(byId('text-size').value, 10);
+  target.obs.outputMode = checkedValue('output-mode') || 'overlay';
+  target.obs.textSourceName = byId('obs-source-name').value.trim();
+  target.browserOverlay = collectOverlayStyle();
+  target.overlay.format = byId('overlay-format').value;
+  target.overlay.idleText = byId('overlay-idle-text').value;
+  target.overlay.showOnlyWhenPlaying = byId('overlay-show-only-playing').checked;
+  target.overlay.textTheme = activeTextTheme;
+  target.overlay.textStyle = {
+    ...collectTextThemeStyle(),
+    size: Number.isInteger(textSize) && textSize >= 8 && textSize <= 400 ? textSize : config.overlay.textStyle.size,
+  };
+}
+
+// ── Themes ───────────────────────────────────────────────────
+
+function allThemes(kind) {
+  const builtIn = kind === 'overlay' ? OVERLAY_THEMES : TEXT_THEMES;
+  return [...builtIn, ...(config.customThemes?.[kind] || [])];
+}
+
+function findTheme(kind, id) {
+  return allThemes(kind).find((theme) => theme.id === id) || null;
+}
+
+function isThemeModified(kind) {
+  const id = kind === 'overlay' ? activeOverlayTheme : activeTextTheme;
+  const theme = findTheme(kind, id);
+  if (!theme) return false;
+  return kind === 'overlay'
+    ? !sameValues(theme.style, collectOverlayThemeStyle(), OVERLAY_THEME_KEYS)
+    : !sameValues(theme.style, collectTextThemeStyle(), TEXT_THEME_KEYS);
+}
+
+function miniOverlayMarkup(style) {
+  const font = OVERLAY_FONTS.find((f) => f.id === style.font) || OVERLAY_FONTS[0];
+  const vars = [
+    `--mini-accent:${style.accent}`,
+    `--mini-accent2:${style.accent2}`,
+    `--mini-surface:${hexToRgba(style.surfaceColor, style.surfaceOpacity)}`,
+    `--mini-text:${style.textColor}`,
+    `--mini-text-soft:${hexToRgba(style.textColor, 0.7)}`,
+    `--mini-glow:${hexToRgba(style.accent, 0.45)}`,
+    `--mini-title-font:${font.title}`,
+    `--mini-body-font:${font.body}`,
+  ].join(';');
+  return `
+    <span class="mini-overlay" style="${escapeAttr(vars)}" data-radius="${escapeAttr(style.radius)}" data-border="${escapeAttr(style.border)}" data-effect="${escapeAttr(style.effect)}" data-font="${escapeAttr(style.font)}" data-uppercase="${style.uppercaseTitle}">
+      <span class="mini-overlay__art"><svg class="icon" aria-hidden="true"><use href="#i-note"/></svg></span>
+      <span class="mini-overlay__body">
+        <span class="mini-overlay__label">Now playing</span>
+        <span class="mini-overlay__title">${SAMPLE_TRACK.title}</span>
+        <span class="mini-overlay__artist">${SAMPLE_TRACK.artist}</span>
+        <span class="mini-overlay__bar"><i></i></span>
+      </span>
+    </span>`;
+}
+
+function textSampleStyle(style, sizePx) {
+  const parts = [
+    `font-family:'${style.face}', 'Segoe UI', sans-serif`,
+    `font-weight:${style.bold ? 700 : 400}`,
+    `font-style:${style.italic ? 'italic' : 'normal'}`,
+    `text-transform:${style.uppercase ? 'uppercase' : 'none'}`,
+    `opacity:${style.opacity / 100}`,
+    `background-color:${hexToRgba(style.backgroundColor, style.backgroundOpacity / 100)}`,
+  ];
+  if (sizePx) parts.push(`font-size:${sizePx}px`);
+  if (style.gradientColor) {
+    parts.push(`background-image:linear-gradient(180deg, ${style.color}, ${style.gradientColor})`, '-webkit-background-clip:text', 'color:transparent');
+  } else {
+    parts.push(`color:${style.color}`);
+  }
+  if (style.outlineColor && style.outlineSize > 0) {
+    const width = Math.max(1, Math.round(Math.min(style.outlineSize, 8) * (sizePx ? 1 : 0.6)));
+    if (style.gradientColor) {
+      // A stroke would cover background-clipped gradient text, so draw the outline as shadows instead.
+      const c = style.outlineColor;
+      parts.push(`filter:drop-shadow(${width}px 0 0 ${c}) drop-shadow(-${width}px 0 0 ${c}) drop-shadow(0 ${width}px 0 ${c}) drop-shadow(0 -${width}px 0 ${c})`);
+    } else {
+      parts.push(`-webkit-text-stroke:${width}px ${style.outlineColor}`, 'paint-order:stroke fill');
+    }
+  }
+  return parts.join(';');
+}
+
+function themeCardMarkup(kind, theme, { custom }) {
+  const selectedId = kind === 'overlay' ? activeOverlayTheme : activeTextTheme;
+  const selected = theme.id === selectedId;
+  const modified = selected && isThemeModified(kind);
+  const art = kind === 'overlay'
+    ? `<span class="theme-card__stage">${miniOverlayMarkup(theme.style)}</span>`
+    : `<span class="theme-card__stage theme-card__stage--text"><span class="text-sample" style="${escapeAttr(textSampleStyle(theme.style))}">${SAMPLE_TRACK.title}</span></span>`;
+  const actions = custom ? `
+      <span class="theme-card__actions">
+        <button class="icon-btn icon-btn--sm" type="button" data-theme-action="rename" aria-label="Rename ${escapeAttr(theme.name)}" title="Rename"><svg class="icon" aria-hidden="true"><use href="#i-pencil"/></svg></button>
+        <button class="icon-btn icon-btn--sm" type="button" data-theme-action="duplicate" aria-label="Duplicate ${escapeAttr(theme.name)}" title="Duplicate"><svg class="icon" aria-hidden="true"><use href="#i-duplicate"/></svg></button>
+        <button class="icon-btn icon-btn--sm icon-btn--danger" type="button" data-theme-action="delete" aria-label="Delete ${escapeAttr(theme.name)}" title="Delete"><svg class="icon" aria-hidden="true"><use href="#i-trash"/></svg></button>
+      </span>` : '';
+  return `
+    <div class="theme-card${selected ? ' is-selected' : ''}" data-theme-kind="${kind}" data-theme-id="${escapeAttr(theme.id)}">
+      <button class="theme-card__apply" type="button" aria-pressed="${selected}" aria-label="Use the ${escapeAttr(theme.name)} theme">
+        ${art}
+        <span class="theme-card__meta">
+          <span class="theme-card__name">${escapeHtml(theme.name)}${modified ? ' <span class="theme-card__badge">Modified</span>' : ''}</span>
+          <span class="theme-card__vibe">${escapeHtml(theme.vibe || 'Custom theme')}</span>
+        </span>
+      </button>
+      ${actions}
+    </div>`;
+}
+
+function renderThemeGalleries() {
+  const customOverlay = config.customThemes?.overlay || [];
+  const customText = config.customThemes?.text || [];
+  byId('overlay-theme-grid').innerHTML = OVERLAY_THEMES.map((t) => themeCardMarkup('overlay', t, { custom: false })).join('');
+  byId('overlay-custom-grid').innerHTML = customOverlay.map((t) => themeCardMarkup('overlay', t, { custom: true })).join('');
+  byId('overlay-custom-empty').hidden = customOverlay.length > 0;
+  byId('text-theme-grid').innerHTML = TEXT_THEMES.map((t) => themeCardMarkup('text', t, { custom: false })).join('');
+  byId('text-custom-grid').innerHTML = customText.map((t) => themeCardMarkup('text', t, { custom: true })).join('');
+  byId('text-custom-empty').hidden = customText.length > 0;
+
+  document.querySelectorAll('.theme-card').forEach((card) => {
+    const { themeKind: kind, themeId: id } = card.dataset;
+    card.querySelector('.theme-card__apply').addEventListener('click', () => applyTheme(kind, id));
+    card.querySelectorAll('[data-theme-action]').forEach((button) => {
+      button.addEventListener('click', () => handleThemeAction(kind, id, button.dataset.themeAction));
+    });
+  });
+}
+
+function refreshThemeSelection() {
+  if (!overlayEditorReady) return;
+  renderThemeGalleries();
+}
+
+function applyTheme(kind, id) {
+  const theme = findTheme(kind, id);
+  if (!theme) return;
+  editorLoading = true;
+  if (kind === 'overlay') {
+    applyOverlayThemeStyleToControls(theme.style);
+    activeOverlayTheme = id;
+  } else {
+    applyTextThemeStyleToControls(theme.style);
+    activeTextTheme = id;
+  }
+  editorLoading = false;
+  updateEditorVisibility();
+  updateOverlayPreview();
+  sendOverlayPreviewStyle();
+  renderThemeGalleries();
+  markOverlayDirty();
+}
+
+async function saveCurrentAsTheme(kind) {
+  const base = findTheme(kind, kind === 'overlay' ? activeOverlayTheme : activeTextTheme);
+  const name = await appDialog.prompt({
+    title: kind === 'overlay' ? 'Save overlay theme' : 'Save text theme',
+    label: 'Theme name',
+    value: base ? `My ${base.name}` : 'My theme',
+    confirmText: 'Save theme',
+  });
+  if (!name) return;
+
+  const theme = {
+    id: newThemeId(),
+    name,
+    style: kind === 'overlay' ? collectOverlayThemeStyle() : collectTextThemeStyle(),
+  };
+  config.customThemes[kind] = [...config.customThemes[kind], theme];
+  if (kind === 'overlay') activeOverlayTheme = theme.id;
+  else activeTextTheme = theme.id;
+  await persistCustomThemes();
+  renderThemeGalleries();
+  markOverlayDirty();
+}
+
+async function handleThemeAction(kind, id, action) {
+  const themes = config.customThemes[kind];
+  const theme = themes.find((t) => t.id === id);
+  if (!theme) return;
+
+  if (action === 'rename') {
+    const name = await appDialog.prompt({ title: 'Rename theme', label: 'Theme name', value: theme.name, confirmText: 'Rename' });
+    if (!name) return;
+    config.customThemes[kind] = themes.map((t) => (t.id === id ? { ...t, name } : t));
+  } else if (action === 'duplicate') {
+    config.customThemes[kind] = [...themes, { ...theme, id: newThemeId(), name: `${theme.name} copy`.slice(0, THEME_NAME_MAX) }];
+  } else if (action === 'delete') {
+    const confirmed = await appDialog.confirm({
+      title: `Delete "${theme.name}"?`,
+      message: 'This removes the saved theme. Your overlay keeps its current look.',
+      confirmText: 'Delete theme',
+      danger: true,
+    });
+    if (!confirmed) return;
+    config.customThemes[kind] = themes.filter((t) => t.id !== id);
+    if (kind === 'overlay' && activeOverlayTheme === id) activeOverlayTheme = null;
+    if (kind === 'text' && activeTextTheme === id) activeTextTheme = null;
+  }
+
+  await persistCustomThemes();
+  renderThemeGalleries();
+}
+
+// Saved themes are stored right away; the draft overlay style stays unsaved until "Save changes".
+async function persistCustomThemes() {
+  const saved = await window.api.getConfig();
+  saved.customThemes = config.customThemes;
+  await window.api.saveConfig(saved);
+}
+
+// ── Dirty state (Overlay module) ─────────────────────────────
+
+function setOverlayDirty(dirty) {
+  overlayDirty = dirty;
+  const inModule = byId('overlay-editor').dataset.context === 'module';
+  byId('overlay-savebar').hidden = !(dirty && inModule);
+}
+
+function markOverlayDirty() {
+  setOverlayDirty(true);
+}
+
+async function persistOverlayEditor() {
+  applyOverlayEditorToConfig(config);
+  await window.api.saveConfig(config);
+  setOverlayDirty(false);
+  await refreshOverlayStatus();
+}
+
+async function saveOverlayModule() {
+  const button = byId('btn-overlay-save');
+  const status = byId('overlay-save-status');
+  button.disabled = true;
+  try {
+    await persistOverlayEditor();
+    status.textContent = '';
+  } catch (error) {
+    status.textContent = `Could not save: ${error.message}`;
+    status.className = 'test-result error';
+  } finally {
+    button.disabled = false;
+  }
+}
+
+function discardOverlayChanges() {
+  loadOverlayEditor();
+  sendOverlayPreviewStyle();
+}
+
+// ── Preview and OBS actions ──────────────────────────────────
+
+const TEXT_PREVIEW_MAX_PX = 56;
+
+function updateOverlayPreview() {
+  const format = byId('overlay-format').value;
+  const idleText = byId('overlay-idle-text').value;
+  const showOnlyPlaying = byId('overlay-show-only-playing').checked;
+  const sample = byId('preview-text');
+  const size = Math.min(parseInt(byId('text-size').value, 10) || 42, TEXT_PREVIEW_MAX_PX);
+
+  sample.textContent = showOnlyPlaying || !idleText
+    ? format.replace('{trackName}', SAMPLE_TRACK.title).replace('{artistName}', SAMPLE_TRACK.artist)
+    : idleText;
+  sample.setAttribute('style', textSampleStyle(collectTextThemeStyle(), size));
+}
+
+function fitOverlayPreview() {
+  const canvas = byId('overlay-preview-canvas');
+  if (!canvas.clientWidth) return;
+  byId('overlay-preview-frame').style.transform = `scale(${canvas.clientWidth / OVERLAY_CANVAS_WIDTH})`;
+}
+
+async function refreshOverlayStatus() {
+  overlayStatus = await window.api.getOverlayStatus();
+  const statusEl = byId('overlay-preview-status');
+  const frame = byId('overlay-preview-frame');
+
+  byId('overlay-url').textContent = overlayStatus.url || 'Not running';
+  byId('btn-add-overlay').disabled = !overlayStatus.running;
+  statusEl.hidden = !overlayStatus.error;
+  statusEl.textContent = overlayStatus.error || '';
+
+  const previewUrl = overlayStatus.url ? `${overlayStatus.url}?preview=1` : '';
+  if (previewUrl && frame.getAttribute('src') !== previewUrl) {
+    frame.setAttribute('src', previewUrl);
+  } else if (!previewUrl) {
+    frame.removeAttribute('src');
+  }
+  fitOverlayPreview();
+}
+
+function sendOverlayPreviewStyle() {
+  const frame = byId('overlay-preview-frame');
+  if (!overlayStatus?.url || !frame.contentWindow) return;
+  const { port, ...style } = collectOverlayStyle();
+  frame.contentWindow.postMessage({ type: OVERLAY_STYLE_MESSAGE, style }, new URL(overlayStatus.url).origin);
+}
+
+async function addOverlayToObs() {
+  const button = byId('btn-add-overlay');
+  const statusEl = byId('add-overlay-status');
+  button.disabled = true;
+  setAuthStatus(statusEl, 'Adding the overlay to OBS…');
+
+  try {
+    await persistOverlayEditor();
+    const result = await window.api.addOverlayToOBS();
+    if (!result.success) {
+      setAuthStatus(statusEl, `Could not add the overlay: ${result.error}`, 'error');
+    } else if (result.created) {
+      setAuthStatus(statusEl, `Added "${result.sourceName}" to the scene "${result.sceneName}". It fills the whole canvas, so no resizing is needed.`, 'success');
+    } else {
+      const where = result.sceneName ? ` in the scene "${result.sceneName}"` : '';
+      setAuthStatus(statusEl, `"${result.sourceName}" already exists${where}. Its URL and size were updated.`, 'success');
+    }
+  } finally {
+    button.disabled = !overlayStatus?.running;
+  }
+}
+
+async function applyTextStyleToObs() {
+  const button = byId('btn-apply-text-style');
+  const statusEl = byId('apply-text-style-status');
+  button.disabled = true;
+  setAuthStatus(statusEl, 'Applying the style in OBS…');
+  try {
+    await persistOverlayEditor();
+    const result = await window.api.applyTextStyle();
+    if (result.success) setAuthStatus(statusEl, 'Style applied to the text source in OBS.', 'success');
+    else setAuthStatus(statusEl, `Could not apply the style: ${result.error}`, 'error');
+  } finally {
+    button.disabled = false;
   }
 }
 
@@ -847,12 +1492,8 @@ function loadSettingsValues() {
   document.getElementById('settings-obs-host').value = config.obs.host;
   document.getElementById('settings-obs-port').value = config.obs.port;
   document.getElementById('settings-obs-password').value = config.obs.password;
-  document.getElementById('settings-obs-source-name').value = config.obs.textSourceName;
   
   // Overlay
-  document.getElementById('settings-overlay-format').value = config.overlay.format;
-  document.getElementById('settings-overlay-idle-text').value = config.overlay.idleText;
-  document.getElementById('settings-overlay-show-only').checked = config.overlay.showOnlyWhenPlaying;
   
   // Behavior
   document.getElementById('settings-polling-interval').value = config.polling.intervalMs;
@@ -967,6 +1608,7 @@ function setupSettingsListeners() {
         await window.api.stopPolling();
         await window.api.startPolling();
       }
+      await refreshOverlayStatus();
       saveStatus.textContent = 'Changes saved';
       saveStatus.className = 'test-result success';
     } catch (error) {
@@ -989,12 +1631,8 @@ async function saveSettingsToConfig() {
   config.obs.host = document.getElementById('settings-obs-host').value;
   config.obs.port = parseInt(document.getElementById('settings-obs-port').value, 10);
   config.obs.password = document.getElementById('settings-obs-password').value;
-  config.obs.textSourceName = document.getElementById('settings-obs-source-name').value;
   
   // Overlay
-  config.overlay.format = document.getElementById('settings-overlay-format').value;
-  config.overlay.idleText = document.getElementById('settings-overlay-idle-text').value;
-  config.overlay.showOnlyWhenPlaying = document.getElementById('settings-overlay-show-only').checked;
   
   // Behavior
   config.polling.intervalMs = parseInt(document.getElementById('settings-polling-interval').value, 10);

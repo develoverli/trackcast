@@ -13,7 +13,8 @@
     "host": "localhost",
     "port": 4455,
     "password": "",
-    "textSourceName": "SpotifyNowPlaying"
+    "textSourceName": "SpotifyNowPlaying",
+    "outputMode": "overlay"
   },
   "polling": {
     "intervalMs": 5000,
@@ -22,7 +23,54 @@
   "overlay": {
     "format": "\ud83c\udfb5 {trackName} \u2014 {artistName}",
     "idleText": "",
-    "showOnlyWhenPlaying": true
+    "showOnlyWhenPlaying": true,
+    "textTheme": "clean",
+    "textStyle": {
+      "face": "Segoe UI",
+      "size": 42,
+      "bold": true,
+      "italic": false,
+      "uppercase": false,
+      "color": "#ffffff",
+      "opacity": 100,
+      "gradientColor": null,
+      "outlineColor": "#000000",
+      "outlineSize": 3,
+      "backgroundColor": "#000000",
+      "backgroundOpacity": 0
+    }
+  },
+  "browserOverlay": {
+    "port": 8890,
+    "theme": "trackcast",
+    "layout": "card",
+    "accent": "#30e07a",
+    "accent2": "#2ec4ce",
+    "surfaceColor": "#0c100e",
+    "surfaceOpacity": 0.82,
+    "textColor": "#f4f7f5",
+    "font": "jakarta",
+    "radius": "rounded",
+    "border": "subtle",
+    "effect": "shadow",
+    "uppercaseTitle": false,
+    "corner": "bottom-left",
+    "animation": "slide",
+    "scale": 1,
+    "showAlbumArt": true,
+    "showArtist": true,
+    "showAlbum": false,
+    "showProgress": true,
+    "whenPaused": "hide",
+    "idleMessage": "Be right back",
+    "labels": {
+      "nowPlaying": "Now playing",
+      "paused": "Paused"
+    }
+  },
+  "customThemes": {
+    "overlay": [],
+    "text": []
   },
   "behavior": {
     "startMinimized": false,

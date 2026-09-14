@@ -72,6 +72,17 @@ Status color is never the only signal: always pair it with an icon or text.
 | Icon button | `.icon-btn` | 32px square, always with `aria-label`. |
 | Icons | `.icon` + `<use href="#i-name">` | Inline SVG sprite in `index.html`, 2px stroke, Lucide style. |
 | Input group | `.input-group` | Input plus trailing ghost buttons declared with `data-paste-target`, `data-copy-input`, `data-copy-target`, `data-reveal-target`. |
+| Choice card | `.choice` + `.choice__input` (radio) | Selectable card with title, optional `.choice__badge`, and text; used for output mode and layout (with `.layout-thumb`). |
+| Swatches | `.swatches` / `.swatch` (`--custom`) | Accent color presets as radios plus a native color picker. |
+| Corner picker | `.corner-picker` | 2×2 radio grid drawn as a tiny 16:9 screen. |
+| Theme card | `.theme-card` + `.theme-card__apply` (+ `__actions` for custom themes) | Live mini preview (`.mini-overlay` or `.text-sample`), name, vibe, *Modified* badge. Selected state uses the accent border. |
+| Mini overlay | `.mini-overlay` | Small CSS replica of the OBS overlay driven by `--mini-*` variables and `data-radius/border/effect/font` attributes. |
+| Color field | `.color-grid` / `.color-field` | Native color input in a swatch with label and hint; optional fields pair it with a *Use* checkbox. |
+| Check chip | `.check-chip` | Pill-shaped checkbox for inline style flags (bold, italic, uppercase). |
+| Save bar | `.savebar` | Sticky pill at the bottom of a page, visible only while there are unsaved changes. |
+| Dialog | `dialog.dialog` (`#app-dialog`) | The only modal. `appDialog.prompt()` and `appDialog.confirm({ danger })`; never native `alert`, `confirm`, or `prompt`. |
+| Overlay preview | `.overlay-preview` | 1920×1080 iframe of the real overlay scaled into a 16:9 canvas; unsaved style is sent with `postMessage`. The iframe uses `color-scheme: normal` so Chromium keeps it transparent. |
+| Disclosure | `.disclosure` | Native `<details>` for advanced options. |
 | Field error | `.field__error` + `.input-group.is-invalid` | Inline error under the field (`id="<input-id>-error"`, linked with `aria-describedby`); states the cause and what to copy instead. |
 | Toggle | `.toggle` + `.toggle__input` | Native checkbox with `role="switch"`, title and hint. |
 | Task list | `.tasks` / `.task` | Numbered setup instructions inside one panel. |
@@ -85,6 +96,17 @@ Status color is never the only signal: always pair it with an icon or text.
 | Notice | `.notice` + `.notice--warning` / `.notice--success` | Inline, non-blocking. Icon + title + text + action row (+ dismiss). |
 | Status text | `.auth-status-text` (+ `.success` / `.error`) | Inline async feedback with `role="status"` and `aria-live="polite"`. Hidden when empty. |
 | Test result | `.test-result` (+ `.success` / `.error`) | Inline result next to a test button. |
+
+## OBS overlay (`src/overlay/`)
+
+Rendered by OBS Browser Source on a transparent canvas, so it follows its own rules:
+
+- Must work in OBS 28+ (Chromium 103): no `:has()`, no `color-mix()`.
+- Sizes in `rem`; `--scale` changes the root font size. Theme colors arrive as `--accent`, `--accent2`, `--text-rgb`, `--surface-rgb`, and `--surface-alpha`; shape, border, effect, and font as `data-*` attributes.
+- Built-in themes live in `src/renderer/themes.js`. A theme only sets visual keys; layout, corner, animation, visible parts, labels, and pause behavior stay with the user.
+- Legible over any stream: dark surface at 82% opacity by default, text shadow when the background is `transparent`, darker accent on the light background.
+- Motion: `--enter` 520 ms ease-out-expo, `--exit` 320 ms ease-in; only `opacity` and `transform`.
+- No backdrop blur: OBS composites the page separately, so it cannot blur the scene behind it.
 
 ## Accessibility
 

@@ -4,7 +4,7 @@
 
 **Show your currently playing Spotify track as a live overlay in OBS Studio.**
 
-A lightweight Electron desktop app that polls the Spotify *currently playing* endpoint and pushes the track text to an OBS text source over OBS WebSocket. A first-run wizard handles the entire setup — no manual config file editing.
+A lightweight Electron desktop app that polls the Spotify *currently playing* endpoint and shows the track in OBS Studio as a styled, animated browser overlay (or a plain text source). A first-run wizard handles the entire setup, including adding the overlay to OBS — no manual config file editing.
 
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](LICENSE)
 [![Latest release](https://img.shields.io/github/v/release/develoverli/trackcast)](https://github.com/develoverli/trackcast/releases/latest)
@@ -25,7 +25,9 @@ A lightweight Electron desktop app that polls the Spotify *currently playing* en
 - **System tray** — minimize to tray, tray status icon (idle / playing / error).
 - **Auto-start with Windows** — optional launch on login.
 - **In-app auto-updates** — pulls new releases from GitHub.
-- **Customizable overlay text** — template with `{trackName}` and `{artistName}` placeholders.
+- **Browser overlay for OBS** — Card, Compact, or Minimal layouts with album art, progress bar, corner, animation, size, and your own labels. Added to OBS with one click, with a live preview in the app.
+- **12 overlay themes** — TrackCast, Midnight, Neon Arcade, Synthwave, Pixel, Terminal, Hype, Elegant, Kawaii, Lo-fi, Ocean, and Mono, each with its own colors, font, borders, and effects. Tweak any of them and save your own.
+- **Styled text source** — or send plain text to an OBS Text (GDI+) source with 8 text themes (Clean, Neon, Hype, Terminal, Elegant, Gold, Kawaii, Subtle) applied to OBS in one click.
 
 ## Requirements
 
@@ -76,19 +78,25 @@ Before first run, prepare the two integrations. The in-app wizard walks you thro
 3. Set a server password (note it down). Default port is `4455`.
 4. Click **OK**.
 
-### 3. Add a text source in OBS
+### 3. Add the overlay to OBS
 
-1. In your scene, add a **Text (GDI+)** source.
-2. Give it a name (e.g. `SpotifyNowPlaying`) — you'll enter this exact name in the wizard.
-3. Style/position it in OBS however you like.
+The wizard does this for you: in step 3 choose **Browser overlay**, pick a theme and layout, and click **Add to OBS**. Later, open **Overlay** in the sidebar to switch themes, customize colors, fonts, borders and effects, or save your own themes. TrackCast creates a **TrackCast Overlay** browser source in your current scene that covers the whole canvas, so you don't need to resize it.
+
+To add it manually instead, create a **Browser** source in OBS with:
+
+- **URL:** `http://127.0.0.1:8890/overlay` (shown in the **Overlay** module)
+- **Width / Height:** your OBS base canvas resolution (for example `1920` × `1080`)
+
+Prefer plain text? Choose **Text source** in step 3 and click **Check or create it in OBS**.
 
 ### 4. Run the wizard
 
 Launch TrackCast and follow the three steps:
 
 1. **Spotify** — copy the suggested app name, description, and Redirect URI into the Spotify form with one click, paste your Client ID + Secret, then click *Authorize*; your browser opens, approve, return to the app.
-2. **OBS** — enter host (`localhost`), port (`4455`), password, and the text source name.
-3. **Done** — the app starts polling and updating your OBS text source.
+2. **OBS** — enter host (`localhost`), port (`4455`) and password, then test the connection.
+3. **Overlay** — pick a layout and style with a live preview, then click **Add to OBS**.
+4. **Behavior** — polling interval, tray, and startup options. TrackCast starts updating OBS right away.
 
 ## Configuration
 
@@ -103,9 +111,11 @@ Edit everything through the in-app **Settings** view — no manual file editing 
 | Section | Keys | Description |
 |---------|------|-------------|
 | `spotify` | `clientId`, `clientSecret`, `redirectUri`, `refreshToken` | Spotify OAuth credentials |
-| `obs` | `host`, `port`, `password`, `textSourceName` | OBS WebSocket connection |
+| `obs` | `host`, `port`, `password`, `textSourceName`, `outputMode` | OBS WebSocket connection. `outputMode`: `overlay`, `text`, or `both` |
+| `browserOverlay` | `port`, `theme`, `layout`, `accent`, `accent2`, `surfaceColor`, `surfaceOpacity`, `textColor`, `font`, `radius`, `border`, `effect`, `uppercaseTitle`, `corner`, `animation`, `scale`, `showAlbumArt`, `showArtist`, `showAlbum`, `showProgress`, `whenPaused`, `idleMessage`, `labels.nowPlaying`, `labels.paused` | Browser overlay served at `http://127.0.0.1:<port>/overlay` (default port `8890`) |
+| `customThemes` | `overlay[]`, `text[]` | Themes you saved: `{ id, name, style }` |
 | `polling` | `intervalMs`, `enabled` | Polling cadence (default `5000` ms) |
-| `overlay` | `format`, `idleText`, `showOnlyWhenPlaying` | Overlay text template — placeholders `{trackName}`, `{artistName}` |
+| `overlay` | `format`, `idleText`, `showOnlyWhenPlaying`, `textTheme`, `textStyle` | Text source template (placeholders `{trackName}`, `{artistName}`) and its OBS style (font, size, colors, gradient, outline, background) |
 | `behavior` | `startMinimized`, `minimizeToTray`, `autoStartWithWindows`, `autoReconnect` | UX behavior |
 
 > [!WARNING]
@@ -134,6 +144,10 @@ Both scripts share the artwork helpers in [`scripts/branding.py`](scripts/brandi
 
 | Problem | Fix |
 |---------|-----|
+| **"OBS WebSocket is not reachable"** | The WebSocket server is off. In OBS open **Tools → WebSocket Server Settings**, check **Enable WebSocket server**, and make sure the port matches TrackCast. |
+| **"OBS rejected the password"** | Copy the password from **Tools → WebSocket Server Settings → Show Connect Info** into **Settings → OBS**. |
+| **Overlay not showing in OBS** | Keep TrackCast running and check that the Browser Source URL matches the **Overlay** module. With *When music is paused* set to *Hide*, the overlay only appears while a song plays. |
+| **"Port 8890 is already in use"** | Another app uses the overlay port. Change it in **Overlay → Customize → Advanced**, save, then click **Add to OBS** again. |
 | **OBS source not updating** | Verify the text source name in OBS matches `obs.textSourceName` **exactly** (case-sensitive). |
 | **OBS connection fails** | Confirm the OBS WebSocket server is enabled and the password matches. Check that Windows Firewall isn't blocking port `4455`. |
 | **`client_id: Invalid` on the Spotify page** | The Client ID field has the wrong value (often the Redirect URI). Copy the **Client ID** from your app's **Settings** in the Spotify Dashboard; it is 32 letters and numbers. |
@@ -168,6 +182,7 @@ TrackCast is built on top of these open-source projects:
 - [electron-log](https://github.com/megahertz/electron-log) — MIT
 - [Inter](https://rsms.me/inter/) typeface by The Inter Project Authors — [SIL Open Font License 1.1](src/renderer/assets/fonts/Inter-OFL.txt)
 - [Plus Jakarta Sans](https://github.com/tokotype/PlusJakartaSans) typeface by The Plus Jakarta Sans Project Authors — [SIL Open Font License 1.1](src/renderer/assets/fonts/PlusJakartaSans-OFL.txt)
+- Overlay theme typefaces, all under the SIL Open Font License 1.1: [Anton](src/renderer/assets/fonts/Anton-OFL.txt), [Space Grotesk](src/renderer/assets/fonts/SpaceGrotesk-OFL.txt), [Playfair Display](src/renderer/assets/fonts/PlayfairDisplay-OFL.txt), [Press Start 2P](src/renderer/assets/fonts/PressStart2P-OFL.txt), [JetBrains Mono](src/renderer/assets/fonts/JetBrainsMono-OFL.txt), [Fredoka](src/renderer/assets/fonts/Fredoka-OFL.txt)
 
 ## Disclaimer
 

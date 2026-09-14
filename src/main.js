@@ -5,9 +5,10 @@ import http from 'http';
 import { randomBytes } from 'crypto';
 import { fileURLToPath } from 'url';
 import { isAutoLaunchEnabled, setAutoLaunch } from './autoLaunch.js';
-import { saveConfig, getConfig } from './configManager.js';
+import { saveConfig, getConfig, OUTPUT_MODES } from './configManager.js';
 import { refreshAccessToken, getCurrentlyPlaying, buildAuthorizeUrl, exchangeAuthorizationCode, validateAppCredentials } from './spotify.js';
-import { connect as connectOBS, updateTextSource, getOBSsources, createTextSource } from './obs.js';
+import { connect as connectOBS, describeObsError, updateTextSource, getOBSsources, createTextSource, applyTextStyle, addOverlaySource } from './obs.js';
+import { startOverlayServer, stopOverlayServer, publishOverlayState, getOverlayStatus, getOverlayUrl } from './overlayServer.js';
 import { setupAutoUpdater, registerUpdaterIpc, checkForUpdates } from './updater.js';
 
 log.transports.file.level = 'info';
@@ -27,6 +28,8 @@ function debounce(fn, wait) {
 let mainWindow = null;
 let tray = null;
 let obsClient = null;
+let obsConnecting = null;
+let obsReconnectTimer = null;
 let pollingInterval = null;
 let accessToken = null;
 let isQuitting = false;
@@ -34,6 +37,9 @@ let reconnectAttempts = 0;
 let pollingBackoff = 0;
 const MAX_RECONNECT_DELAY = 30000;
 let currentTrack = null;
+let overlayError = null;
+// Shown in a freshly created text source until a track plays; an empty GDI+ source is a 2 px sliver.
+const TEXT_SOURCE_PLACEHOLDER = '♪ TrackCast is waiting for Spotify…';
 const TOKEN_EXPIRY_BUFFER_MS = 300000; // Refresh 5 min before expiry
 
 // Log buffer for renderer
@@ -260,6 +266,30 @@ function showConnectionNotification(service, connected) {
 // Core polling logic
 // ─────────────────────────────────────────────────────────────
 
+function sendsTextSource(config) {
+  const mode = OUTPUT_MODES.includes(config.obs.outputMode) ? config.obs.outputMode : 'overlay';
+  return mode === 'text' || mode === 'both';
+}
+
+// Only what the overlay renders; never credentials.
+function overlayStyleFromConfig(config) {
+  const { port, ...style } = config.browserOverlay;
+  return style;
+}
+
+async function startOverlay() {
+  const config = getConfig();
+  try {
+    await startOverlayServer(config.browserOverlay.port);
+    overlayError = null;
+    publishOverlayState({ style: overlayStyleFromConfig(config), tracking: config.polling.enabled });
+    log.info('[Overlay] Serving', getOverlayUrl());
+  } catch (error) {
+    overlayError = error.message;
+    log.error('[Overlay] Could not start overlay server:', error.message);
+  }
+}
+
 function formatTrack(trackName, artistName) {
   const config = getConfig();
   return config.overlay.format
@@ -298,26 +328,30 @@ async function fetchAndUpdate() {
       updateTrayMenu();
       updateTrayTooltip();
       pollingBackoff = 0; // Reset backoff on success
-      
-      if (!config.overlay.showOnlyWhenPlaying) {
-        await updateTextSourceSafe(config.overlay.idleText || '');
-      } else {
-        await updateTextSourceSafe('');
+      publishOverlayState({ track: null, tracking: true });
+
+      if (sendsTextSource(config)) {
+        await updateTextSourceSafe(config.overlay.showOnlyWhenPlaying ? '' : config.overlay.idleText || '');
+      }
+      if (mainWindow && !mainWindow.isDestroyed()) {
+        mainWindow.webContents.send('track-update', null);
       }
       reconnectAttempts = 0;
       return;
     }
 
     currentTrack = track;
-    const text = formatTrack(track.trackName, track.artistName);
-    
+    publishOverlayState({ track, tracking: true });
+
     updateTrayIcon('playing');
     updateTrayMenu();
     updateTrayTooltip();
-    
+
     showTrackChangeNotification(track);
-    
-    await updateTextSourceSafe(text);
+
+    if (sendsTextSource(config)) {
+      await updateTextSourceSafe(formatTrack(track.trackName, track.artistName));
+    }
     reconnectAttempts = 0;
     pollingBackoff = 0; // Reset backoff on success
 
@@ -366,46 +400,76 @@ async function updateTextSourceSafe(text) {
   }
 }
 
-async function connectToOBS() {
-  const config = getConfig();
-  
-  try {
-    if (obsClient) {
-      try {
-        await obsClient.disconnect();
-      } catch {}
-    }
-    
-    obsClient = await connectOBS(config);
-    reconnectAttempts = 0;
-    updateTrayIcon(currentTrack ? 'playing' : 'idle');
-    showConnectionNotification('OBS', true);
-    
-    if (mainWindow && !mainWindow.isDestroyed()) {
-      mainWindow.webContents.send('obs-status', { connected: true });
-    }
-  } catch (error) {
-    updateTrayIcon('error');
-    showConnectionNotification('OBS', false);
-    if (mainWindow && !mainWindow.isDestroyed()) {
-      mainWindow.webContents.send('obs-error', error.message);
-    }
-    
-    scheduleOBSReconnect();
+function handleObsClosed(client) {
+  // Ignore close events from a client we already replaced or disconnected on purpose.
+  if (client !== obsClient || isQuitting) return;
+  obsClient = null;
+  log.warn('[OBS] Connection closed');
+  updateTrayIcon('error');
+  if (mainWindow && !mainWindow.isDestroyed()) {
+    mainWindow.webContents.send('obs-status', { connected: false });
   }
+  scheduleOBSReconnect();
+}
+
+/** Connect (or reconnect) to OBS. Resolves to { success } or { success: false, error } and never throws. */
+async function connectToOBS() {
+  if (obsConnecting) return obsConnecting;
+
+  obsConnecting = (async () => {
+    const config = getConfig();
+    clearTimeout(obsReconnectTimer);
+    obsReconnectTimer = null;
+
+    const previous = obsClient;
+    obsClient = null;
+    if (previous) {
+      try { await previous.disconnect(); } catch { /* already closed */ }
+    }
+
+    try {
+      obsClient = await connectOBS(config, { onClose: handleObsClosed });
+      reconnectAttempts = 0;
+      log.info('[OBS] Connected to', `${config.obs.host}:${config.obs.port}`);
+      updateTrayIcon(currentTrack ? 'playing' : 'idle');
+      showConnectionNotification('OBS', true);
+      if (mainWindow && !mainWindow.isDestroyed()) {
+        mainWindow.webContents.send('obs-status', { connected: true });
+      }
+      return { success: true };
+    } catch (error) {
+      const message = describeObsError(error, config);
+      log.warn('[OBS] Connection failed:', message);
+      updateTrayIcon('error');
+      showConnectionNotification('OBS', false);
+      if (mainWindow && !mainWindow.isDestroyed()) {
+        mainWindow.webContents.send('obs-error', message);
+      }
+      scheduleOBSReconnect();
+      return { success: false, error: message };
+    }
+  })();
+
+  try {
+    return await obsConnecting;
+  } finally {
+    obsConnecting = null;
+  }
+}
+
+async function ensureObsConnection() {
+  return obsClient ? { success: true } : connectToOBS();
 }
 
 function scheduleOBSReconnect() {
   const config = getConfig();
-  if (!config.behavior.autoReconnect) return;
-  
+  if (!config.behavior.autoReconnect || obsReconnectTimer || isQuitting) return;
+
   reconnectAttempts++;
   const delay = Math.min(3000 * Math.pow(2, reconnectAttempts - 1), MAX_RECONNECT_DELAY);
-  
-  setTimeout(() => {
-    if (!isQuitting) {
-      connectToOBS();
-    }
+  obsReconnectTimer = setTimeout(() => {
+    obsReconnectTimer = null;
+    if (!isQuitting) connectToOBS();
   }, delay);
 }
 
@@ -413,6 +477,7 @@ function togglePolling() {
   const config = getConfig();
   config.polling.enabled = !config.polling.enabled;
   saveConfig(config);
+  publishOverlayState({ tracking: config.polling.enabled });
   
   if (mainWindow && !mainWindow.isDestroyed()) {
     mainWindow.webContents.send('polling-status', config.polling.enabled);
@@ -426,12 +491,7 @@ function togglePolling() {
 }
 
 async function testOBSConnection() {
-  try {
-    await connectToOBS();
-    return { success: true };
-  } catch (error) {
-    return { success: false, error: error.message };
-  }
+  return connectToOBS();
 }
 
 // ─────────────────────────────────────────────────────────────
@@ -451,6 +511,9 @@ async function initializeApp() {
   } catch (error) {
     console.error('Failed to get initial access token:', error.message);
   }
+
+  // Serve the browser overlay (also used by the in-app preview during setup)
+  await startOverlay();
 
   // Connect to OBS
   await connectToOBS();
@@ -494,6 +557,7 @@ app.on('window-all-closed', () => {
 });
 
 app.on('quit', () => {
+  stopOverlayServer();
   if (pollingInterval) {
     clearInterval(pollingInterval);
   }
@@ -512,9 +576,39 @@ ipcMain.handle('get-config', () => {
   return getConfig();
 });
 
-ipcMain.handle('save-config', (event, config) => {
+ipcMain.handle('save-config', async (event, config) => {
+  const previousPort = getOverlayStatus().port;
   saveConfig(config);
-  return { success: true };
+
+  if (config.browserOverlay.port !== previousPort) {
+    await startOverlay();
+  } else {
+    publishOverlayState({ style: overlayStyleFromConfig(config) });
+  }
+  return { success: true, overlay: { ...getOverlayStatus(), error: overlayError } };
+});
+
+ipcMain.handle('overlay-get-status', () => {
+  return { ...getOverlayStatus(), error: overlayError };
+});
+
+ipcMain.handle('overlay-add-to-obs', async () => {
+  const status = getOverlayStatus();
+  if (!status.running) {
+    return { success: false, error: overlayError || 'The overlay server is not running.' };
+  }
+  const connection = await ensureObsConnection();
+  if (!connection.success) {
+    return { success: false, error: connection.error };
+  }
+  try {
+    const result = await addOverlaySource(obsClient, status.url);
+    log.info('[Overlay] Browser source', result.created ? 'created in' : 'updated in', result.sceneName || '(no scene)');
+    return { success: true, ...result };
+  } catch (error) {
+    log.error('[Overlay] Could not add browser source:', error.message);
+    return { success: false, error: error.message };
+  }
 });
 
 ipcMain.handle('test-obs-connection', async () => {
@@ -522,10 +616,8 @@ ipcMain.handle('test-obs-connection', async () => {
 });
 
 ipcMain.handle('obs-check-source', async (event, sourceName) => {
-  if (!obsClient) {
-    try { await connectToOBS(); } catch (e) { return { error: e.message }; }
-  }
-  if (!obsClient) return { error: 'Not connected to OBS' };
+  const connection = await ensureObsConnection();
+  if (!connection.success) return { error: connection.error };
   try {
     const inputs = await getOBSsources(obsClient);
     const target = String(sourceName || '').trim();
@@ -551,15 +643,34 @@ ipcMain.handle('obs-check-source', async (event, sourceName) => {
 });
 
 ipcMain.handle('obs-create-source', async (event, sourceName) => {
-  if (!obsClient) {
-    try { await connectToOBS(); } catch (e) { return { error: e.message }; }
-  }
-  if (!obsClient) return { error: 'Not connected to OBS' };
+  const connection = await ensureObsConnection();
+  if (!connection.success) return { error: connection.error };
   try {
-    const result = await createTextSource(obsClient, sourceName, {});
+    const config = getConfig();
+    const result = await createTextSource(obsClient, sourceName, {
+      text: currentTrack ? formatTrack(currentTrack.trackName, currentTrack.artistName) : TEXT_SOURCE_PLACEHOLDER,
+      style: config.overlay.textStyle,
+      corner: config.browserOverlay.corner,
+    });
     return { success: true, sceneName: result.sceneName };
   } catch (e) {
     return { error: e.message };
+  }
+});
+
+ipcMain.handle('obs-apply-text-style', async () => {
+  const connection = await ensureObsConnection();
+  if (!connection.success) return { success: false, error: connection.error };
+  const config = getConfig();
+  try {
+    await applyTextStyle(obsClient, config.obs.textSourceName, config.overlay.textStyle);
+    return { success: true };
+  } catch (e) {
+    const missing = /No source was found|not found/i.test(e.message);
+    return {
+      success: false,
+      error: missing ? `There is no source named "${config.obs.textSourceName}" in OBS yet. Create it first.` : e.message,
+    };
   }
 });
 
