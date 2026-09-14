@@ -7,6 +7,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [1.1.0] - 2026-09-14
+
 ### Added
 
 - **Browser overlay for OBS**: a transparent, animated overlay served by TrackCast at `http://127.0.0.1:8890/overlay`, with Card, Compact, and Minimal layouts, album art, progress bar, accent color, background, corner, entrance animation, font, size, editable labels, and a configurable paused state (hide, show as paused, or a custom message). Style changes reach OBS instantly.
@@ -84,5 +86,6 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Customizable overlay text template with `{trackName}` and `{artistName}` placeholders.
 - Windows NSIS installer.
 
-[Unreleased]: https://github.com/develoverli/trackcast/compare/v1.0.0...HEAD
+[Unreleased]: https://github.com/develoverli/trackcast/compare/v1.1.0...HEAD
+[1.1.0]: https://github.com/develoverli/trackcast/compare/v1.0.0...v1.1.0
 [1.0.0]: https://github.com/develoverli/trackcast/releases/tag/v1.0.0
