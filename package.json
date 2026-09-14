@@ -5,17 +5,21 @@
   "main": "src/main.js",
   "type": "module",
   "author": {
-    "name": "coldevotion",
-    "email": ""
+    "name": "develoverli",
+    "url": "https://github.com/develoverli"
   },
   "license": "MIT",
-  "homepage": "https://github.com/coldevotion/trackcast#readme",
+  "packageManager": "pnpm@11.12.0",
+  "engines": {
+    "node": ">=22"
+  },
+  "homepage": "https://github.com/develoverli/trackcast#readme",
   "repository": {
     "type": "git",
-    "url": "https://github.com/coldevotion/trackcast.git"
+    "url": "https://github.com/develoverli/trackcast.git"
   },
   "bugs": {
-    "url": "https://github.com/coldevotion/trackcast/issues"
+    "url": "https://github.com/develoverli/trackcast/issues"
   },
   "keywords": [
     "spotify",
@@ -46,7 +50,7 @@
   "build": {
     "appId": "com.trackcast.app",
     "productName": "TrackCast",
-    "copyright": "Copyright © 2026 coldevotion",
+    "copyright": "Copyright © 2026 develoverli",
     "directories": {
       "output": "dist"
     },
@@ -54,7 +58,7 @@
       "icon": "build/icon.ico",
       "legalTrademarks": "",
       "signtoolOptions": {
-        "publisherName": "coldevotion"
+        "publisherName": "develoverli"
       },
       "target": [
         {
@@ -83,7 +87,7 @@
     ],
     "publish": {
       "provider": "github",
-      "owner": "coldevotion",
+      "owner": "develoverli",
       "repo": "trackcast"
     }
   }
