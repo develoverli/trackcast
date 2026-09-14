@@ -10,6 +10,7 @@ A lightweight Electron desktop app that polls the Spotify *currently playing* en
 [![Latest release](https://img.shields.io/github/v/release/develoverli/trackcast)](https://github.com/develoverli/trackcast/releases/latest)
 [![Made with Electron](https://img.shields.io/badge/Electron-33-47848F.svg)](https://www.electronjs.org/)
 [![PRs welcome](https://img.shields.io/badge/PRs-welcome-brightgreen.svg)](CONTRIBUTING.md)
+[![Keep TrackCast free on Ko-fi](https://img.shields.io/badge/Ko--fi-Keep%20TrackCast%20free-FF5E5B?logo=ko-fi&logoColor=white)](https://ko-fi.com/develover)
 
 <img width="868" height="587" alt="TrackCast main window showing the currently playing Spotify track and the OBS connection status" src="https://github.com/user-attachments/assets/b0260f84-b1ce-48b1-a8d9-e14273608ca5" />
 </div>
@@ -27,7 +28,7 @@ A lightweight Electron desktop app that polls the Spotify *currently playing* en
 - **In-app auto-updates** — pulls new releases from GitHub.
 - **Browser overlay for OBS** — Card, Compact, or Minimal layouts with album art, progress bar, corner, animation, size, and your own labels. Added to OBS with one click, with a live preview in the app.
 - **12 overlay themes** — TrackCast, Midnight, Neon Arcade, Synthwave, Pixel, Terminal, Hype, Elegant, Kawaii, Lo-fi, Ocean, and Mono, each with its own colors, font, borders, and effects. Tweak any of them and save your own.
-- **Styled text source** — or send plain text to an OBS Text (GDI+) source with 8 text themes (Clean, Neon, Hype, Terminal, Elegant, Gold, Kawaii, Subtle) applied to OBS in one click.
+- **Styled text source** — or send plain text to an OBS Text (GDI+) source with 8 text themes (Clean, Neon, Hype, Terminal, Elegant, Gold, Kawaii, Subtle). Style and text changes reach OBS as soon as you save.
 
 ## Requirements
 

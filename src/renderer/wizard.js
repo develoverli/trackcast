@@ -1,5 +1,6 @@
 const SPOTIFY_DASHBOARD_URL = 'https://developer.spotify.com/dashboard';
 const PROJECT_URL = 'https://github.com/develoverli/trackcast';
+const SUPPORT_URL = 'https://ko-fi.com/develover';
 const SPOTIFY_APP_NAME = 'TrackCast';
 const SPOTIFY_APP_DESCRIPTION = 'Shows my currently playing Spotify track as a live overlay in OBS Studio.';
 const COPY_FEEDBACK_MS = 2000;
@@ -15,7 +16,7 @@ let config = null;
 let currentStep = 'welcome';
 let isPollingEnabled = true;
 let appShellReady = false;
-const connectionState = { spotify: 'idle', obs: 'idle' };
+const connectionState = { spotify: 'idle', obs: 'idle', textSourceError: null };
 
 // ─────────────────────────────────────────────────────────────
 // Initialization
@@ -47,6 +48,8 @@ function setupWindowControls() {
   const max = document.getElementById('win-maximize');
   const close = document.getElementById('win-close');
   const maxIcon = document.getElementById('win-maximize-icon');
+
+  document.getElementById('btn-support').addEventListener('click', () => window.api.openExternal(SUPPORT_URL));
 
   if (min) min.addEventListener('click', () => window.api.windowMinimize());
   if (max) max.addEventListener('click', () => window.api.windowMaximizeToggle());
@@ -228,6 +231,12 @@ function setupSidebarListeners() {
     });
   });
 
+  document.getElementById('btn-status-fix').addEventListener('click', () => {
+    showView('overlay');
+    selectEditorTab(document.getElementById('tab-text-content'));
+    document.getElementById('app-main').scrollTop = 0;
+  });
+
   const pollingBtn = document.getElementById('btn-sidebar-polling');
   if (pollingBtn) {
     pollingBtn.addEventListener('click', async () => {
@@ -275,9 +284,19 @@ function updateStatusSummary() {
   if (!isPollingEnabled) text = 'Tracking paused';
   else if (connectionState.spotify === 'error') text = 'Spotify needs attention';
   else if (connectionState.obs === 'error') text = 'OBS is offline';
+  else if (connectionState.textSourceError) text = 'Text source needs attention';
   else if (connectionState.spotify === 'ok' && connectionState.obs === 'ok') text = 'Live on OBS';
 
   if (summary.textContent !== text) summary.textContent = text;
+
+  const fix = document.getElementById('btn-status-fix');
+  if (fix) {
+    fix.hidden = !connectionState.textSourceError || connectionState.obs !== 'ok';
+    fix.title = connectionState.textSourceError || '';
+    document.getElementById('status-fix-text').textContent = /no text source named/i.test(connectionState.textSourceError || '')
+      ? 'Text source not found'
+      : 'Text source error';
+  }
 }
 
 // ─────────────────────────────────────────────────────────────
@@ -809,15 +828,23 @@ async function handleSourceCreate(sourceName) {
 // ─────────────────────────────────────────────────────────────
 
 const OVERLAY_CANVAS_WIDTH = 1920;
+const OVERLAY_CANVAS_HEIGHT = 1080;
 const OVERLAY_STYLE_MESSAGE = 'trackcast:overlay-style';
 const HEX_COLOR_PATTERN = /^#[0-9a-f]{6}$/i;
 const THEME_NAME_MAX = 40;
+// OBS Text (GDI+) has no color emoji support; ♪ exists in the Windows UI fonts.
+const EMOJI_PATTERN = /\p{Extended_Pictographic}/gu;
+const VARIATION_SELECTOR_PATTERN = /\uFE0F/g;
+const TEXT_NOTE_SYMBOL = '\u266a';
 const SAMPLE_TRACK = { title: 'Bad Habit', artist: 'Steve Lacy' };
 const {
   OVERLAY_FONTS, OVERLAY_THEME_KEYS, OVERLAY_THEMES, TEXT_THEME_KEYS, TEXT_THEMES, TEXT_FACES,
 } = window.TrackCastThemes;
 
+const EDITOR_TAB_STORAGE_KEY = 'overlay.editorTab';
+const PREVIEW_ZOOM = 2.4;
 let overlayEditorReady = false;
+let previewZoomed = false;
 let overlayStatus = null;
 let overlayDirty = false;
 let editorLoading = false;
@@ -934,28 +961,63 @@ function mountOverlayEditor(slotId, context) {
   if (!editor || !slot) return;
   if (editor.parentElement !== slot) slot.appendChild(editor);
   editor.dataset.context = context;
-  if (context === 'wizard') {
-    byId('overlay-panel-themes').hidden = false;
-    byId('overlay-panel-customize').hidden = false;
-  } else {
-    selectEditorTab(document.querySelector('[data-editor-tab].is-active') || byId('overlay-tab-themes'));
+  updateEditorVisibility();
+}
+
+function readStoredEditorTab() {
+  try {
+    return localStorage.getItem(EDITOR_TAB_STORAGE_KEY);
+  } catch {
+    return null;
   }
 }
 
-function selectEditorTab(tab) {
+function selectEditorTab(tab, { remember = true } = {}) {
+  if (!tab) return;
   document.querySelectorAll('[data-editor-tab]').forEach((button) => {
     const selected = button === tab;
     button.classList.toggle('is-active', selected);
     button.setAttribute('aria-selected', String(selected));
     button.tabIndex = selected ? 0 : -1;
-    byId(button.dataset.editorTab).hidden = !selected;
   });
+  if (remember) {
+    try { localStorage.setItem(EDITOR_TAB_STORAGE_KEY, tab.id); } catch { /* storage unavailable */ }
+  }
+  updateEditorVisibility();
 }
 
+// Shows the preview, tabs and panels that match the output mode.
+// In the Overlay module one tab is visible at a time; the wizard shows every relevant panel stacked.
 function updateEditorVisibility() {
+  const editor = byId('overlay-editor');
   const mode = checkedValue('output-mode') || 'overlay';
-  byId('editor-browser').hidden = mode === 'text';
-  byId('editor-text').hidden = mode === 'overlay';
+  const inModule = editor.dataset.context === 'module';
+  editor.dataset.mode = mode;
+
+  const tabs = [...document.querySelectorAll('[data-editor-tab]')];
+  tabs.forEach((tab) => {
+    tab.hidden = !tab.dataset.modes.split(' ').includes(mode);
+    tab.textContent = mode === 'both' ? tab.dataset.labelBoth : tab.dataset.label;
+  });
+
+  let active = tabs.find((tab) => tab.classList.contains('is-active') && !tab.hidden);
+  if (!active) {
+    active = tabs.find((tab) => tab.id === readStoredEditorTab() && !tab.hidden) || tabs.find((tab) => !tab.hidden);
+    tabs.forEach((tab) => {
+      const selected = tab === active;
+      tab.classList.toggle('is-active', selected);
+      tab.setAttribute('aria-selected', String(selected));
+      tab.tabIndex = selected ? 0 : -1;
+    });
+  }
+
+  editor.querySelectorAll('[data-modes]').forEach((element) => {
+    if (element.matches('[data-editor-tab]')) return;
+    const inMode = element.dataset.modes.split(' ').includes(mode);
+    const isPanel = element.classList.contains('editor-panel');
+    element.hidden = !inMode || (isPanel && inModule && element.id !== active?.dataset.editorTab);
+  });
+
   byId('overlay-idle-field').hidden = byId('overlay-when-paused').value !== 'idle';
   byId('overlay-scale-value').textContent = `${Math.round(Number(byId('overlay-scale').value) * 100)}%`;
   byId('overlay-surface-opacity-value').textContent = `${Math.round(Number(byId('overlay-surface-opacity').value) * 100)}%`;
@@ -965,6 +1027,7 @@ function updateEditorVisibility() {
   byId('text-gradient-color').disabled = !byId('text-gradient-on').checked;
   byId('text-outline-color').disabled = !byId('text-outline-on').checked;
   byId('text-outline-size').disabled = !byId('text-outline-on').checked;
+  fitOverlayPreview();
 }
 
 // ── Setup ────────────────────────────────────────────────────
@@ -992,20 +1055,35 @@ function setupOverlayEditor() {
   editor.addEventListener('input', onEdit);
   editor.addEventListener('change', onEdit);
 
-  document.querySelectorAll('[data-editor-tab]').forEach((tab, index, tabs) => {
+  document.querySelectorAll('[data-editor-tab]').forEach((tab) => {
     tab.addEventListener('click', () => selectEditorTab(tab));
     tab.addEventListener('keydown', (event) => {
       if (event.key !== 'ArrowRight' && event.key !== 'ArrowLeft') return;
-      const next = tabs[(index + (event.key === 'ArrowRight' ? 1 : tabs.length - 1)) % tabs.length];
+      const visible = [...document.querySelectorAll('[data-editor-tab]')].filter((t) => !t.hidden);
+      const index = visible.indexOf(tab);
+      const next = visible[(index + (event.key === 'ArrowRight' ? 1 : visible.length - 1)) % visible.length];
       selectEditorTab(next);
       next.focus();
     });
   });
 
+  const zoomButton = byId('btn-preview-zoom');
+  zoomButton.addEventListener('click', () => {
+    previewZoomed = !previewZoomed;
+    zoomButton.setAttribute('aria-pressed', String(previewZoomed));
+    zoomButton.classList.toggle('is-active', previewZoomed);
+    fitOverlayPreview();
+  });
+
   byId('overlay-preview-frame').addEventListener('load', sendOverlayPreviewStyle);
   byId('btn-add-overlay').addEventListener('click', addOverlayToObs);
   byId('btn-check-source').addEventListener('click', handleSourceCheck);
-  byId('btn-apply-text-style').addEventListener('click', applyTextStyleToObs);
+  byId('btn-replace-emoji').addEventListener('click', () => {
+    const input = byId('overlay-format');
+    input.value = input.value.replace(EMOJI_PATTERN, TEXT_NOTE_SYMBOL).replace(VARIATION_SELECTOR_PATTERN, '');
+    input.dispatchEvent(new Event('input', { bubbles: true }));
+    input.focus();
+  });
   byId('btn-save-overlay-theme').addEventListener('click', () => saveCurrentAsTheme('overlay'));
   byId('btn-save-text-theme').addEventListener('click', () => saveCurrentAsTheme('text'));
   byId('btn-overlay-save').addEventListener('click', saveOverlayModule);
@@ -1394,7 +1472,7 @@ function discardOverlayChanges() {
 
 // ── Preview and OBS actions ──────────────────────────────────
 
-const TEXT_PREVIEW_MAX_PX = 56;
+const TEXT_PREVIEW_MAX_PX = 30;
 
 function updateOverlayPreview() {
   const format = byId('overlay-format').value;
@@ -1407,12 +1485,30 @@ function updateOverlayPreview() {
     ? format.replace('{trackName}', SAMPLE_TRACK.title).replace('{artistName}', SAMPLE_TRACK.artist)
     : idleText;
   sample.setAttribute('style', textSampleStyle(collectTextThemeStyle(), size));
+
+  const hasEmoji = new RegExp(EMOJI_PATTERN.source, 'u').test(format) || new RegExp(EMOJI_PATTERN.source, 'u').test(idleText);
+  byId('overlay-format-emoji').hidden = !hasEmoji;
 }
 
 function fitOverlayPreview() {
   const canvas = byId('overlay-preview-canvas');
-  if (!canvas.clientWidth) return;
-  byId('overlay-preview-frame').style.transform = `scale(${canvas.clientWidth / OVERLAY_CANVAS_WIDTH})`;
+  const frame = byId('overlay-preview-frame');
+  const width = canvas.clientWidth;
+  if (!width) return;
+
+  const fitScale = width / OVERLAY_CANVAS_WIDTH;
+  if (!previewZoomed) {
+    frame.style.transform = `scale(${fitScale})`;
+    return;
+  }
+
+  // Zoom toward the corner where the widget is anchored.
+  const scale = fitScale * PREVIEW_ZOOM;
+  const corner = checkedValue('overlay-corner') || 'bottom-left';
+  const height = canvas.clientHeight;
+  const x = corner.endsWith('right') ? width - OVERLAY_CANVAS_WIDTH * scale : 0;
+  const y = corner.startsWith('bottom') ? height - OVERLAY_CANVAS_HEIGHT * scale : 0;
+  frame.style.transform = `translate(${x}px, ${y}px) scale(${scale})`;
 }
 
 async function refreshOverlayStatus() {
@@ -1463,20 +1559,6 @@ async function addOverlayToObs() {
   }
 }
 
-async function applyTextStyleToObs() {
-  const button = byId('btn-apply-text-style');
-  const statusEl = byId('apply-text-style-status');
-  button.disabled = true;
-  setAuthStatus(statusEl, 'Applying the style in OBS…');
-  try {
-    await persistOverlayEditor();
-    const result = await window.api.applyTextStyle();
-    if (result.success) setAuthStatus(statusEl, 'Style applied to the text source in OBS.', 'success');
-    else setAuthStatus(statusEl, `Could not apply the style: ${result.error}`, 'error');
-  } finally {
-    button.disabled = false;
-  }
-}
 
 // ─────────────────────────────────────────────────────────────
 // Settings
@@ -1655,6 +1737,17 @@ function setupStatusListeners() {
   window.api.onTrackUpdate((track) => {
     updateTrackDisplay(track);
     updateFooterStatus('spotify', track ? 'ok' : 'idle');
+  });
+
+  // Events sent before this window loaded are missed, so ask for the current state once.
+  window.api.getConnectionStatus().then((status) => {
+    connectionState.textSourceError = status.textSourceError;
+    updateFooterStatus('obs', status.obsConnected ? 'ok' : 'idle');
+  });
+
+  window.api.onTextSourceStatus((status) => {
+    connectionState.textSourceError = status.ok ? null : status.error;
+    updateStatusSummary();
   });
 
   window.api.onOBSStatus((status) => {

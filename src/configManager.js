@@ -26,6 +26,8 @@ const LEGACY_LOOPBACK_HOST = 'localhost';
 
 export const OUTPUT_MODES = ['overlay', 'text', 'both'];
 export const DEFAULT_OVERLAY_PORT = 8890;
+const LEGACY_NOTE_EMOJI = '\ud83c\udfb5';
+const TEXT_NOTE_SYMBOL = '\u266a';
 
 // Maps the pre-theme `browserOverlay.background` setting to the new surface keys.
 const LEGACY_BACKGROUNDS = {
@@ -61,7 +63,8 @@ const DEFAULT_CONFIG = {
     enabled: true,
   },
   overlay: {
-    format: '\ud83c\udfb5 {trackName} \u2014 {artistName}',
+    // OBS Text (GDI+) cannot draw color emoji, so the default uses the ♪ symbol from Segoe UI.
+    format: '\u266a {trackName} \u2014 {artistName}',
     idleText: '',
     showOnlyWhenPlaying: true,
     textTheme: 'clean',
@@ -162,6 +165,11 @@ export function loadConfig() {
       delete configCache.browserOverlay.background;
       configCache.behavior = { ...DEFAULT_CONFIG.behavior, ...configCache.behavior };
       configCache.setup = { ...DEFAULT_CONFIG.setup, ...configCache.setup };
+
+      // The old default used 🎵, which OBS text sources render as an empty box.
+      if (configCache.overlay.format.includes(LEGACY_NOTE_EMOJI)) {
+        configCache.overlay.format = configCache.overlay.format.split(LEGACY_NOTE_EMOJI).join(TEXT_NOTE_SYMBOL);
+      }
 
       // Installations set up before the browser overlay existed keep using the text source.
       if (!parsed.obs?.outputMode && configCache.setup.completed) {

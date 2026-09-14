@@ -10,9 +10,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Added
 
 - **Browser overlay for OBS**: a transparent, animated overlay served by TrackCast at `http://127.0.0.1:8890/overlay`, with Card, Compact, and Minimal layouts, album art, progress bar, accent color, background, corner, entrance animation, font, size, editable labels, and a configurable paused state (hide, show as paused, or a custom message). Style changes reach OBS instantly.
+- *Keep TrackCast free* button in the title bar, visible on every screen, linking to the project's Ko-fi page. The repository shows a GitHub *Sponsor* button (`.github/FUNDING.yml`) and a Ko-fi badge in the README.
 - **Overlay module** in the sidebar with a large live preview, a *Themes* gallery, and a *Customize* tab. Unsaved changes show a sticky *Save / Discard* bar.
 - **12 overlay themes** with distinct personalities (TrackCast, Midnight, Neon Arcade, Synthwave, Pixel, Terminal, Hype, Elegant, Kawaii, Lo-fi, Ocean, Mono) and new style controls: second accent, background color and opacity, text color, font, corners, border (including gradient), effect (shadow, neon glow, hard shadow, text shadow), and uppercase titles.
-- **8 text source themes** (Clean, Neon, Hype, Terminal, Elegant, Gold, Kawaii, Subtle) using Windows fonts, a full text style editor (font, size, bold, italic, uppercase, color, gradient, outline, background), and *Apply style to OBS*.
+- **8 text source themes** (Clean, Neon, Hype, Terminal, Elegant, Gold, Kawaii, Subtle) using Windows fonts, and a full text style editor (font, size, bold, italic, uppercase, color, gradient, outline, background). Saving applies the style and the current text to OBS immediately.
 - **My themes**: save, rename, duplicate, and delete your own overlay and text themes.
 - Six theme typefaces: Anton, Space Grotesk, Playfair Display, Press Start 2P, JetBrains Mono, and Fredoka.
 - **Add to OBS** button that creates (or updates) a *TrackCast Overlay* browser source in the current scene, sized to the OBS canvas, plus a live preview in the app.
@@ -33,6 +34,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Changed
 
 - Setup wizard step 2 now only handles the OBS connection; step 3 picks the output, theme, layout, and corner. The full editor lives in the new *Overlay* module instead of Settings.
+- The Overlay module uses two columns: a compact, sticky live preview (with a zoom into the overlay corner) next to tabs that follow the output mode, so *Both* no longer stacks every setting in one long page. Scrollbars are thinner and styled to match the app.
 - The overlay `background` setting (dark, solid, light, transparent) became background color and opacity; existing configs are migrated automatically.
 - Project ownership moved to [develoverli](https://github.com/develoverli); repository, update feed, and copyright now point to `develoverli/trackcast`.
 - Pinned toolchain: Node.js 22+ and pnpm 11 (`packageManager` / `engines` in `package.json`).
@@ -54,7 +56,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - *Re-authorize Spotify* in Settings was hidden, ignored the Settings fields, and gave no feedback.
 - Home did not clear the track when Spotify stopped playing.
 - OBS connection errors were hidden: *Test connection* always reported success, and every failure said "Not connected". TrackCast now shows the real cause (WebSocket server turned off, wrong password, or OBS too old), writes it to the log, and reconnects automatically when OBS closes and reopens.
+- The sidebar said *OBS is offline* while OBS was connected and the overlay worked: a missing text source was reported as a connection failure, and a connection made before the window loaded was never shown. Text source problems now appear as a separate *Fix in Overlay* warning, are logged once, and the window reads the real connection state when it opens.
 - A newly created text source could appear as a thin, tall vertical bar because it was created empty; it now starts with the current song or a placeholder and saves the chosen output mode first, so it keeps updating.
+- The default text format used the 🎵 emoji, which OBS text sources draw as an empty box. It now uses ♪, existing formats are migrated, and the editor warns about emoji with a one-click fix.
 - *Check or create it in OBS* created an unstyled Arial text source at the top-left corner and ignored its style settings. It now picks the current OBS text source type (Text GDI+ v3, or FreeType outside Windows), uses bold white text with a black outline, and places it in the overlay corner.
 - The update listener crashed because it referenced elements that did not exist.
 - Settings had a close button that jumped back to the setup wizard.

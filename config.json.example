@@ -21,7 +21,7 @@
     "enabled": true
   },
   "overlay": {
-    "format": "\ud83c\udfb5 {trackName} \u2014 {artistName}",
+    "format": "\u266a {trackName} \u2014 {artistName}",
     "idleText": "",
     "showOnlyWhenPlaying": true,
     "textTheme": "clean",

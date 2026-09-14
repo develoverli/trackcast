@@ -79,6 +79,9 @@ Status color is never the only signal: always pair it with an icon or text.
 | Mini overlay | `.mini-overlay` | Small CSS replica of the OBS overlay driven by `--mini-*` variables and `data-radius/border/effect/font` attributes. |
 | Color field | `.color-grid` / `.color-field` | Native color input in a swatch with label and hint; optional fields pair it with a *Use* checkbox. |
 | Check chip | `.check-chip` | Pill-shaped checkbox for inline style flags (bold, italic, uppercase). |
+| Editor layout | `.editor-layout` / `.editor-aside` / `.editor-main` | Container query on `.overlay-editor[data-context=module]`: two columns from 700 px (sticky preview + tabbed panels), stacked below and in the wizard. Panels declare `data-modes`; tabs carry `data-label` and `data-label-both`. |
+| Editor tabs | `.editor-tabs` / `.editor-tabs__btn` | Sticky, wrapping pill tabs; last tab remembered in `localStorage`. |
+| Scrollbars | `::-webkit-scrollbar*` | 12 px track with a 6 px pill thumb; the main area reveals its thumb on hover, accent while dragging. |
 | Save bar | `.savebar` | Sticky pill at the bottom of a page, visible only while there are unsaved changes. |
 | Dialog | `dialog.dialog` (`#app-dialog`) | The only modal. `appDialog.prompt()` and `appDialog.confirm({ danger })`; never native `alert`, `confirm`, or `prompt`. |
 | Overlay preview | `.overlay-preview` | 1920×1080 iframe of the real overlay scaled into a 16:9 canvas; unsaved style is sent with `postMessage`. The iframe uses `color-scheme: normal` so Chromium keeps it transparent. |

@@ -38,6 +38,7 @@ let pollingBackoff = 0;
 const MAX_RECONNECT_DELAY = 30000;
 let currentTrack = null;
 let overlayError = null;
+let textSourceError = null;
 // Shown in a freshly created text source until a track plays; an empty GDI+ source is a 2 px sliver.
 const TEXT_SOURCE_PLACEHOLDER = '♪ TrackCast is waiting for Spotify…';
 const TOKEN_EXPIRY_BUFFER_MS = 300000; // Refresh 5 min before expiry
@@ -387,16 +388,29 @@ async function fetchAndUpdate() {
   }
 }
 
+function setTextSourceError(message) {
+  if (message === textSourceError) return;
+  textSourceError = message;
+  if (message) log.warn('[OBS] Text source update failed:', message);
+  else log.info('[OBS] Text source updates are working again');
+  if (mainWindow && !mainWindow.isDestroyed()) {
+    mainWindow.webContents.send('text-source-status', { ok: !message, error: message });
+  }
+}
+
+// Text source failures are reported separately: OBS itself can be connected and the overlay working.
 async function updateTextSourceSafe(text) {
   if (!obsClient) return;
-  
+
   const config = getConfig();
   try {
     await updateTextSource(obsClient, config.obs.textSourceName, text);
+    setTextSourceError(null);
   } catch (error) {
-    if (mainWindow && !mainWindow.isDestroyed()) {
-      mainWindow.webContents.send('obs-error', error.message);
-    }
+    const missing = /No source was found/i.test(error.message);
+    setTextSourceError(missing
+      ? `There is no text source named "${config.obs.textSourceName}" in OBS.`
+      : error.message);
   }
 }
 
@@ -576,9 +590,38 @@ ipcMain.handle('get-config', () => {
   return getConfig();
 });
 
+function textSourceSnapshot(config) {
+  return JSON.stringify([
+    config.obs.outputMode, config.obs.textSourceName, config.overlay.format,
+    config.overlay.idleText, config.overlay.showOnlyWhenPlaying, config.overlay.textStyle,
+  ]);
+}
+
+/** Push the saved text style and the current text to the OBS text source right away. */
+async function syncTextSourceNow(config) {
+  if (!obsClient || !sendsTextSource(config)) return;
+  try {
+    await applyTextStyle(obsClient, config.obs.textSourceName, config.overlay.textStyle);
+  } catch (error) {
+    // The source may not exist yet; creating it applies the style.
+    log.info('[OBS] Text style not applied:', error.message);
+    return;
+  }
+  const idle = config.overlay.showOnlyWhenPlaying ? '' : config.overlay.idleText || '';
+  const playing = currentTrack && (currentTrack.isPlaying || !config.overlay.showOnlyWhenPlaying);
+  await updateTextSourceSafe(playing ? formatTrack(currentTrack.trackName, currentTrack.artistName) : idle);
+}
+
 ipcMain.handle('save-config', async (event, config) => {
   const previousPort = getOverlayStatus().port;
+  const previousText = textSourceSnapshot(getConfig());
   saveConfig(config);
+
+  if (!sendsTextSource(config)) {
+    setTextSourceError(null);
+  } else if (textSourceSnapshot(config) !== previousText) {
+    await syncTextSourceNow(config);
+  }
 
   if (config.browserOverlay.port !== previousPort) {
     await startOverlay();
@@ -652,10 +695,19 @@ ipcMain.handle('obs-create-source', async (event, sourceName) => {
       style: config.overlay.textStyle,
       corner: config.browserOverlay.corner,
     });
+    setTextSourceError(null);
     return { success: true, sceneName: result.sceneName };
   } catch (e) {
     return { error: e.message };
   }
+});
+
+ipcMain.handle('get-connection-status', () => {
+  const config = getConfig();
+  return {
+    obsConnected: Boolean(obsClient),
+    textSourceError: sendsTextSource(config) ? textSourceError : null,
+  };
 });
 
 ipcMain.handle('obs-apply-text-style', async () => {

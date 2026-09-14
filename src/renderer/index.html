@@ -30,6 +30,8 @@
     <symbol id="i-pencil" viewBox="0 0 24 24"><path d="M12 20h9"/><path d="M16.5 3.5a2.1 2.1 0 1 1 3 3L7 19l-4 1 1-4z"/></symbol>
     <symbol id="i-duplicate" viewBox="0 0 24 24"><rect x="8" y="8" width="13" height="13" rx="2"/><path d="M4 16V5a2 2 0 0 1 2-2h11"/></symbol>
     <symbol id="i-trash" viewBox="0 0 24 24"><path d="M3 6h18"/><path d="M8 6V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/><path d="M19 6l-1 14a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2L5 6"/></symbol>
+    <symbol id="i-heart" viewBox="0 0 24 24"><path d="M20.8 4.6a5.5 5.5 0 0 0-7.8 0L12 5.7l-1-1.1a5.5 5.5 0 0 0-7.8 7.8l1 1.1L12 21l7.8-7.5 1-1.1a5.5 5.5 0 0 0 0-7.8z"/></symbol>
+    <symbol id="i-zoom" viewBox="0 0 24 24"><circle cx="11" cy="11" r="7"/><path d="m20 20-3.5-3.5"/><path d="M11 8v6"/><path d="M8 11h6"/></symbol>
     <symbol id="i-wave" viewBox="0 0 24 24"><path d="M3 10v4"/><path d="M7 6v12"/><path d="M11 3v18"/><path d="M15 8v8"/><path d="M19 5v14"/><path d="M23 10v4"/></symbol>
   </svg>
 
@@ -38,6 +40,12 @@
       <div class="titlebar__brand">
         <svg class="icon titlebar__brand-icon" aria-hidden="true"><use href="#i-note"/></svg>
         <span class="wordmark">Track<span class="wordmark__accent">Cast</span></span>
+      </div>
+      <div class="titlebar__actions">
+        <button class="support-btn" id="btn-support" type="button" title="TrackCast is free and open source. A small tip on Ko-fi keeps it updated.">
+          <svg class="icon support-btn__heart" aria-hidden="true"><use href="#i-heart"/></svg>
+          <span>Keep TrackCast free</span>
+        </button>
       </div>
       <div class="titlebar__controls">
         <button class="titlebar__btn" id="win-minimize" type="button" aria-label="Minimize" title="Minimize">
@@ -87,6 +95,11 @@
               <span class="status-row__state" id="footer-obs-state">Waiting</span>
             </li>
           </ul>
+          <button class="status-card__fix" id="btn-status-fix" type="button" hidden>
+            <svg class="icon" aria-hidden="true"><use href="#i-alert"/></svg>
+            <span id="status-fix-text">Text source not found</span>
+            <span class="status-card__fix-action">Fix in Overlay</span>
+          </button>
           <button class="switch-row" id="btn-sidebar-polling" type="button" role="switch" aria-checked="true">
             <span id="sidebar-polling-label">Tracking on</span>
             <span class="switch" aria-hidden="true"><span class="switch__thumb"></span></span>
@@ -317,8 +330,9 @@
 
             <div class="editor-slot" id="wizard-overlay-slot">
               <!-- Overlay editor: one instance, moved between the setup wizard and the Overlay module -->
-              <div class="overlay-editor" id="overlay-editor" data-context="wizard">
-                <fieldset class="choice-group">
+              <!-- Overlay editor: one instance, moved between the setup wizard and the Overlay module -->
+              <div class="overlay-editor" id="overlay-editor" data-context="wizard" data-mode="overlay">
+                <fieldset class="choice-group choice-group--output">
                   <legend class="choice-group__legend">What to send to OBS</legend>
                   <div class="choice-grid choice-grid--3">
                     <label class="choice">
@@ -345,11 +359,16 @@
                   </div>
                 </fieldset>
 
-                <!-- ═════════════ Browser overlay ═════════════ -->
-                <div class="overlay-editor__section" id="editor-browser">
+                <div class="editor-layout">
+                  <aside class="editor-aside" aria-label="Live preview">
+                    <div class="editor-aside__sticky">
+                      <div data-modes="overlay both">
                   <div class="overlay-preview">
                     <div class="overlay-preview__canvas" id="overlay-preview-canvas">
                       <iframe class="overlay-preview__frame" id="overlay-preview-frame" title="Overlay preview" tabindex="-1"></iframe>
+                    <button class="icon-btn icon-btn--sm overlay-preview__zoom" id="btn-preview-zoom" type="button" aria-pressed="false" aria-label="Zoom into the overlay corner" title="Zoom into the overlay corner">
+                      <svg class="icon" aria-hidden="true"><use href="#i-zoom"/></svg>
+                    </button>
                     </div>
                     <p class="overlay-preview__status" id="overlay-preview-status" role="status" aria-live="polite" hidden></p>
                     <div class="overlay-preview__bar">
@@ -364,13 +383,28 @@
                     </div>
                     <p class="auth-status-text" id="add-overlay-status" role="status" aria-live="polite"></p>
                   </div>
+                      </div>
+                      <div data-modes="text both">
+                  <figure class="text-preview">
+                    <figcaption class="obs-preview__caption">Text preview</figcaption>
+                    <div class="text-preview__stage">
+                      <span class="text-preview__sample" id="preview-text">Song Title · Artist Name</span>
+                    </div>
+                  </figure>
+                      </div>
+                    </div>
+                  </aside>
 
-                  <div class="segmented segmented--tabs" role="tablist" aria-label="Overlay editor" data-scope="module">
-                    <button class="segmented__btn is-active" type="button" role="tab" id="overlay-tab-themes" aria-selected="true" aria-controls="overlay-panel-themes" data-editor-tab="overlay-panel-themes">Themes</button>
-                    <button class="segmented__btn" type="button" role="tab" id="overlay-tab-customize" aria-selected="false" aria-controls="overlay-panel-customize" data-editor-tab="overlay-panel-customize" tabindex="-1">Customize</button>
-                  </div>
+                  <div class="editor-main">
+                <div class="editor-tabs" role="tablist" aria-label="Overlay editor sections" data-scope="module">
+                  <button class="editor-tabs__btn" type="button" role="tab" id="tab-overlay-themes" aria-controls="panel-overlay-themes" data-editor-tab="panel-overlay-themes" data-modes="overlay both" data-label="Themes" data-label-both="Overlay themes">Themes</button>
+                  <button class="editor-tabs__btn" type="button" role="tab" id="tab-overlay-style" aria-controls="panel-overlay-style" data-editor-tab="panel-overlay-style" data-modes="overlay both" data-label="Customize" data-label-both="Overlay style">Customize</button>
+                  <button class="editor-tabs__btn" type="button" role="tab" id="tab-text-themes" aria-controls="panel-text-themes" data-editor-tab="panel-text-themes" data-modes="text both" data-label="Themes" data-label-both="Text themes">Themes</button>
+                  <button class="editor-tabs__btn" type="button" role="tab" id="tab-text-style" aria-controls="panel-text-style" data-editor-tab="panel-text-style" data-modes="text both" data-label="Style" data-label-both="Text style">Style</button>
+                  <button class="editor-tabs__btn" type="button" role="tab" id="tab-text-content" aria-controls="panel-text-content" data-editor-tab="panel-text-content" data-modes="text both" data-label="Content" data-label-both="Text content">Content</button>
+                </div>
 
-                  <div class="editor-panel" id="overlay-panel-themes" role="tabpanel" aria-labelledby="overlay-tab-themes">
+                <div class="editor-panel" id="panel-overlay-themes" role="tabpanel" aria-labelledby="tab-overlay-themes" data-modes="overlay both">
                     <div class="theme-section">
                       <div class="theme-section__header">
                         <h3 class="panel__title">Themes</h3>
@@ -386,9 +420,9 @@
                       <div class="theme-grid" id="overlay-custom-grid"></div>
                       <p class="field__hint" id="overlay-custom-empty">Tweak a theme in Customize, then save it here to reuse it later.</p>
                     </div>
-                  </div>
+                </div>
 
-                  <div class="editor-panel" id="overlay-panel-customize" role="tabpanel" aria-labelledby="overlay-tab-customize">
+                <div class="editor-panel" id="panel-overlay-style" role="tabpanel" aria-labelledby="tab-overlay-style" data-modes="overlay both">
                     <fieldset class="choice-group">
                       <legend class="choice-group__legend">Layout</legend>
                       <div class="choice-grid choice-grid--3">
@@ -555,35 +589,9 @@
                         </div>
                       </div>
                     </details>
-                  </div>
                 </div>
 
-                <!-- ═════════════ Text source ═════════════ -->
-                <div class="overlay-editor__section" id="editor-text">
-                  <div class="panel">
-                    <h3 class="panel__title">Text source in OBS</h3>
-                    <div class="field">
-                      <label class="field__label" for="obs-source-name">Text source name</label>
-                      <div class="input-group">
-                        <input class="input" type="text" id="obs-source-name" spellcheck="false" placeholder="SpotifyNowPlaying">
-                        <button class="btn btn--ghost btn--sm input-group__btn copy-btn" type="button" data-copy-input="obs-source-name" aria-label="Copy text source name"><svg class="icon" aria-hidden="true"><use href="#i-copy"/></svg><span class="copy-btn__label">Copy</span></button>
-                      </div>
-                    </div>
-                    <div class="task__actions">
-                      <button id="btn-check-source" class="btn btn--secondary btn--sm" type="button">Check or create it in OBS</button>
-                      <button id="btn-apply-text-style" class="btn btn--ghost btn--sm" type="button">Apply style to OBS</button>
-                    </div>
-                    <div class="source-result" id="source-result" role="status" aria-live="polite" hidden></div>
-                    <p class="auth-status-text" id="apply-text-style-status" role="status" aria-live="polite"></p>
-                  </div>
-
-                  <figure class="text-preview">
-                    <figcaption class="obs-preview__caption">Text preview</figcaption>
-                    <div class="text-preview__stage">
-                      <span class="text-preview__sample" id="preview-text">Song Title · Artist Name</span>
-                    </div>
-                  </figure>
-
+                <div class="editor-panel" id="panel-text-themes" role="tabpanel" aria-labelledby="tab-text-themes" data-modes="text both">
                   <div class="theme-section">
                     <div class="theme-section__header">
                       <h3 class="panel__title">Text themes</h3>
@@ -601,7 +609,10 @@
                     <p class="field__hint" id="text-custom-empty">Adjust the style below, then save it here to reuse it later.</p>
                   </div>
 
-                  <div class="panel" data-scope="module">
+                </div>
+
+                <div class="editor-panel" id="panel-text-style" role="tabpanel" aria-labelledby="tab-text-style" data-modes="text both" data-scope="module">
+                  <div class="panel">
                     <h3 class="panel__title">Text style</h3>
                     <div class="field-grid field-grid--even">
                       <div class="field">
@@ -646,12 +657,33 @@
                     </div>
                   </div>
 
+                </div>
+
+                <div class="editor-panel" id="panel-text-content" role="tabpanel" aria-labelledby="tab-text-content" data-modes="text both">
+                  <div class="panel">
+                    <h3 class="panel__title">Text source in OBS</h3>
+                    <div class="field">
+                      <label class="field__label" for="obs-source-name">Text source name</label>
+                      <div class="input-group">
+                        <input class="input" type="text" id="obs-source-name" spellcheck="false" placeholder="SpotifyNowPlaying">
+                        <button class="btn btn--ghost btn--sm input-group__btn copy-btn" type="button" data-copy-input="obs-source-name" aria-label="Copy text source name"><svg class="icon" aria-hidden="true"><use href="#i-copy"/></svg><span class="copy-btn__label">Copy</span></button>
+                      </div>
+                    </div>
+                    <div class="task__actions">
+                      <button id="btn-check-source" class="btn btn--secondary btn--sm" type="button">Check or create it in OBS</button>
+                    </div>
+                    <div class="source-result" id="source-result" role="status" aria-live="polite" hidden></div>
+                  </div>
                   <div class="panel">
                     <h3 class="panel__title">What it says</h3>
                     <div class="field">
                       <label class="field__label" for="overlay-format">Text format</label>
-                      <input class="input" type="text" id="overlay-format" spellcheck="false">
-                      <p class="field__hint">Placeholders: <code>{trackName}</code> and <code>{artistName}</code>.</p>
+                      <input class="input" type="text" id="overlay-format" spellcheck="false" aria-describedby="overlay-format-emoji">
+                      <p class="field__hint">Placeholders: <code>{trackName}</code> and <code>{artistName}</code>. Style and text reach OBS as soon as you save.</p>
+                      <div class="inline-warning" id="overlay-format-emoji" hidden>
+                        <span>OBS text sources can't show emoji; they appear as empty boxes.</span>
+                        <button class="btn btn--secondary btn--sm" id="btn-replace-emoji" type="button">Replace emoji with ♪</button>
+                      </div>
                     </div>
                     <div class="field">
                       <label class="field__label" for="overlay-idle-text">Idle text</label>
@@ -664,6 +696,8 @@
                         <span class="toggle__hint">Clears the text when Spotify is paused.</span>
                       </span>
                     </label>
+                  </div>
+                </div>
                   </div>
                 </div>
 
@@ -817,7 +851,7 @@
 
         <!-- Overlay module -->
         <section id="view-overlay" class="view" hidden aria-labelledby="overlay-view-title">
-          <div class="page">
+          <div class="page page--wide">
             <header class="page__header">
               <div>
                 <h1 class="page__title" id="overlay-view-title">Overlay</h1>

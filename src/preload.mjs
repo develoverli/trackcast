@@ -57,6 +57,10 @@ contextBridge.exposeInMainWorld('api', {
   onOBSStatus: (callback) => {
     ipcRenderer.on('obs-status', (event, status) => callback(status));
   },
+  getConnectionStatus: () => ipcRenderer.invoke('get-connection-status'),
+  onTextSourceStatus: (callback) => {
+    ipcRenderer.on('text-source-status', (event, status) => callback(status));
+  },
   onOBSError: (callback) => {
     ipcRenderer.on('obs-error', (event, error) => callback(error));
   },
