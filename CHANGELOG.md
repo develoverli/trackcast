@@ -11,7 +11,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 - Project ownership moved to [develoverli](https://github.com/develoverli); repository, update feed, and copyright now point to `develoverli/trackcast`.
 - Pinned toolchain: Node.js 22+ and pnpm 11 (`packageManager` / `engines` in `package.json`).
-- README now documents the NSIS installer, the real `config.json` location, and the `showAlbumArt` key.
+- README now documents the NSIS installer and the real `config.json` location.
 
 ### Added
 
@@ -21,7 +21,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Removed
 
-- `.env.example` — configuration is handled by the setup wizard and `config.json`.
+- `.env.example` and the legacy `.env` fallback (`dotenv` dependency) — configuration is handled by the setup wizard and `config.json`.
+- Unused `overlay.showAlbumArt` config key.
 
 ## [1.0.0] - 2026-07-13
 

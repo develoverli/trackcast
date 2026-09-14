@@ -21,8 +21,7 @@
   "overlay": {
     "format": "\ud83c\udfb5 {trackName} \u2014 {artistName}",
     "idleText": "",
-    "showOnlyWhenPlaying": true,
-    "showAlbumArt": false
+    "showOnlyWhenPlaying": true
   },
   "behavior": {
     "startMinimized": false,

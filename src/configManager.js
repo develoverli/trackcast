@@ -2,7 +2,6 @@ import { readFileSync, writeFileSync, existsSync, mkdirSync } from 'fs';
 import { fileURLToPath } from 'url';
 import { dirname, join } from 'path';
 import { app } from 'electron';
-import dotenv from 'dotenv';
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 
@@ -19,9 +18,6 @@ function resolveUserDataDir() {
 const USER_DATA_DIR = resolveUserDataDir();
 const CONFIG_PATH = join(USER_DATA_DIR, 'config.json');
 const LEGACY_CONFIG_PATH = join(__dirname, '..', 'config.json');
-const LEGACY_ENV_PATH = join(__dirname, '..', '.env');
-
-dotenv.config({ path: LEGACY_ENV_PATH });
 
 const DEFAULT_CONFIG = {
   version: '1.0.0',
@@ -47,7 +43,6 @@ const DEFAULT_CONFIG = {
     format: '\ud83c\udfb5 {trackName} \u2014 {artistName}',
     idleText: '',
     showOnlyWhenPlaying: true,
-    showAlbumArt: false,
   },
   behavior: {
     startMinimized: false,
@@ -87,7 +82,7 @@ export function loadConfig() {
       configCache = { ...DEFAULT_CONFIG };
     }
   } else {
-    configCache = migrateFromEnv();
+    configCache = { ...DEFAULT_CONFIG };
   }
 
   return configCache;
@@ -112,46 +107,6 @@ export function updateConfig(partial) {
 
 export function getConfig() {
   return loadConfig();
-}
-
-function migrateFromEnv() {
-  const envConfig = { ...DEFAULT_CONFIG };
-
-  // Try to read from .env (backwards compat)
-  if (process.env.SPOTIFY_CLIENT_ID) {
-    envConfig.spotify.clientId = process.env.SPOTIFY_CLIENT_ID;
-  }
-  if (process.env.SPOTIFY_CLIENT_SECRET) {
-    envConfig.spotify.clientSecret = process.env.SPOTIFY_CLIENT_SECRET;
-  }
-  if (process.env.SPOTIFY_REDIRECT_URI) {
-    envConfig.spotify.redirectUri = process.env.SPOTIFY_REDIRECT_URI;
-  }
-  if (process.env.SPOTIFY_REFRESH_TOKEN) {
-    envConfig.spotify.refreshToken = process.env.SPOTIFY_REFRESH_TOKEN;
-  }
-  if (process.env.OBS_HOST) {
-    envConfig.obs.host = process.env.OBS_HOST;
-  }
-  if (process.env.OBS_PORT) {
-    envConfig.obs.port = parseInt(process.env.OBS_PORT, 10);
-  }
-  if (process.env.OBS_PASSWORD) {
-    envConfig.obs.password = process.env.OBS_PASSWORD;
-  }
-  if (process.env.NAME_GUI_TEXT_OBS) {
-    envConfig.obs.textSourceName = process.env.NAME_GUI_TEXT_OBS;
-  }
-  if (process.env.TIME) {
-    envConfig.polling.intervalMs = parseInt(process.env.TIME, 10);
-  }
-
-  // If we found any spotify credentials, consider setup completed
-  if (envConfig.spotify.clientId && envConfig.spotify.refreshToken) {
-    envConfig.setup.completed = true;
-  }
-
-  return envConfig;
 }
 
 export function resetConfig() {

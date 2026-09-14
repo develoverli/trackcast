@@ -104,7 +104,7 @@ Edit everything through the in-app **Settings** view — no manual file editing 
 | `spotify` | `clientId`, `clientSecret`, `redirectUri`, `refreshToken` | Spotify OAuth credentials |
 | `obs` | `host`, `port`, `password`, `textSourceName` | OBS WebSocket connection |
 | `polling` | `intervalMs`, `enabled` | Polling cadence (default `5000` ms) |
-| `overlay` | `format`, `idleText`, `showOnlyWhenPlaying`, `showAlbumArt` | Overlay text template — placeholders `{trackName}`, `{artistName}`. `showAlbumArt` is reserved for a future release. |
+| `overlay` | `format`, `idleText`, `showOnlyWhenPlaying` | Overlay text template — placeholders `{trackName}`, `{artistName}` |
 | `behavior` | `startMinimized`, `minimizeToTray`, `autoStartWithWindows`, `autoReconnect` | UX behavior |
 
 > [!WARNING]
@@ -155,7 +155,6 @@ TrackCast is built on top of these open-source projects:
 - [axios](https://github.com/axios/axios) — MIT
 - [electron-updater / electron-builder](https://github.com/electron-userland/electron-builder) — MIT
 - [electron-log](https://github.com/megahertz/electron-log) — MIT
-- [dotenv](https://github.com/motdotla/dotenv) — BSD-2-Clause
 - [Inter](https://rsms.me/inter/) typeface by The Inter Project Authors — [SIL Open Font License 1.1](src/renderer/assets/fonts/OFL.txt)
 
 ## Disclaimer
