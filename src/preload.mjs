@@ -20,10 +20,12 @@ contextBridge.exposeInMainWorld('api', {
   openExternal: (url) => ipcRenderer.invoke('open-external', url),
   showItemInFolder: (path) => ipcRenderer.invoke('show-item-in-folder', path),
   getLogBuffer: () => ipcRenderer.invoke('get-log-buffer'),
+  copyText: (text) => ipcRenderer.invoke('clipboard-write-text', text),
+  readClipboardText: () => ipcRenderer.invoke('clipboard-read-text'),
+  getAppVersion: () => ipcRenderer.invoke('get-app-version'),
 
   // Spotify Auth
-  waitForAuthCode: () => ipcRenderer.invoke('wait-for-auth-code'),
-  startAuthServer: (config) => ipcRenderer.invoke('start-auth-server', config),
+  authorizeSpotify: (credentials) => ipcRenderer.invoke('spotify-authorize', credentials),
 
   // Updater
   checkForUpdates: () => ipcRenderer.invoke('check-for-updates'),

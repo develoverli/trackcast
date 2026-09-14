@@ -1,6 +1,6 @@
 {
   "name": "trackcast",
-  "version": "1.0.0",
+  "version": "1.1.0",
   "description": "Display the currently playing Spotify track as a live overlay in OBS Studio",
   "main": "src/main.js",
   "type": "module",
@@ -71,7 +71,12 @@
       "perMachine": false,
       "allowToChangeInstallationDirectory": true,
       "createDesktopShortcut": true,
-      "createStartMenuShortcut": true
+      "createStartMenuShortcut": true,
+      "artifactName": "${productName}-Setup-${version}.${ext}",
+      "include": "build/installer.nsh",
+      "installerSidebar": "build/installerSidebar.bmp",
+      "uninstallerSidebar": "build/installerSidebar.bmp",
+      "installerHeader": "build/installerHeader.bmp"
     },
     "files": [
       "src/**/*",

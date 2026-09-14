@@ -1,8 +1,21 @@
+const SPOTIFY_DASHBOARD_URL = 'https://developer.spotify.com/dashboard';
+const PROJECT_URL = 'https://github.com/develoverli/trackcast';
+const SPOTIFY_APP_NAME = 'TrackCast';
+const SPOTIFY_APP_DESCRIPTION = 'Shows my currently playing Spotify track as a live overlay in OBS Studio.';
+const COPY_FEEDBACK_MS = 2000;
+// Spotify Client IDs and secrets are 32 hexadecimal characters.
+const SPOTIFY_CREDENTIAL_PATTERN = /^[0-9a-f]{32}$/i;
+const URL_PATTERN = /^https?:\/\//i;
+const SAVE_FEEDBACK_MS = 3000;
+const WIZARD_STEPS = ['spotify', 'obs', 'overlay', 'behavior'];
+const HERO_STEPS = ['welcome', 'complete'];
+
 // State
 let config = null;
 let currentStep = 'welcome';
 let isPollingEnabled = true;
-let authServer = null;
+let appShellReady = false;
+const connectionState = { spotify: 'idle', obs: 'idle' };
 
 // ─────────────────────────────────────────────────────────────
 // Initialization
@@ -12,16 +25,10 @@ document.addEventListener('DOMContentLoaded', async () => {
   config = await window.api.getConfig();
 
   setupWindowControls();
+  setupFieldHelpers();
 
   if (config.setup.completed) {
-    enableAppShell();
-    setupSidebarListeners();
-    setupHelpLanguageToggle();
-    showView('home');
-    loadSettingsValues();
-    setupSettingsListeners();
-    updatePollingLabel(config.polling.enabled !== false);
-    window.api.getCurrentTrack().then((track) => renderNowPlaying(track));
+    openAppShell();
   } else {
     showStep('welcome');
     setupWizardListeners();
@@ -29,8 +36,6 @@ document.addEventListener('DOMContentLoaded', async () => {
 
   setupStatusListeners();
   setupGlobalListeners();
-
-  updateIntervalDisplay('polling-interval', config.polling.intervalMs);
 });
 
 // ─────────────────────────────────────────────────────────────
@@ -71,10 +76,27 @@ function setupWindowControls() {
 function showStep(stepName) {
   document.querySelectorAll('.step').forEach(s => s.classList.remove('active'));
   const step = document.getElementById(`step-${stepName}`);
-  if (step) {
-    step.classList.add('active');
-    currentStep = stepName;
-  }
+  if (!step) return;
+
+  step.classList.add('active');
+  currentStep = stepName;
+
+  const wizard = document.getElementById('wizard-container');
+  wizard.classList.toggle('wizard--hero', HERO_STEPS.includes(stepName));
+  updateStepper(stepName);
+  document.getElementById('app-main').scrollTop = 0;
+}
+
+function updateStepper(stepName) {
+  const stepper = document.getElementById('wizard-stepper');
+  const index = WIZARD_STEPS.indexOf(stepName);
+  stepper.hidden = index === -1;
+  stepper.querySelectorAll('.stepper__item').forEach((item, i) => {
+    item.classList.toggle('is-done', i < index);
+    item.classList.toggle('is-current', i === index);
+    if (i === index) item.setAttribute('aria-current', 'step');
+    else item.removeAttribute('aria-current');
+  });
 }
 
 function showView(viewName) {
@@ -93,10 +115,19 @@ function showView(viewName) {
   });
 }
 
-function showWizard() {
-  document.querySelectorAll('.view').forEach(v => { v.hidden = true; });
-  const wizard = document.getElementById('wizard-container');
-  if (wizard) wizard.hidden = false;
+function openAppShell() {
+  if (!appShellReady) {
+    appShellReady = true;
+    enableAppShell();
+    setupSidebarListeners();
+    setupHelpLanguageToggle();
+    loadSettingsValues();
+    setupSettingsListeners();
+    setupRedirectUriNotice();
+  }
+  showView('home');
+  updatePollingLabel(config.polling.enabled !== false);
+  window.api.getCurrentTrack().then((track) => renderNowPlaying(track));
 }
 
 function enableAppShell() {
@@ -117,7 +148,7 @@ const HELP_I18N = {
     'help.quickstart.title': 'Quick Start',
     'help.quickstart.body': '<li>Create a free Spotify Developer app and copy its Client ID and Secret.</li><li>Turn on OBS WebSocket (Tools menu inside OBS Studio).</li><li>Run this app and follow the wizard. Done.</li>',
     'help.spotify.title': 'Step 1 · Create a Spotify Developer App',
-    'help.spotify.body': '<li>Go to <strong>developer.spotify.com/dashboard</strong> and sign in with your Spotify account.</li><li>Click <strong>Create app</strong>. Name and description can be anything.</li><li>In <strong>Redirect URIs</strong> add exactly: <code>http://localhost:8888/callback</code></li><li>Save. Open the app, then click <strong>Settings</strong> to copy your Client ID and Client Secret.</li>',
+    'help.spotify.body': '<li>Go to <strong>developer.spotify.com/dashboard</strong> and sign in with your Spotify account.</li><li>Click <strong>Create app</strong>. Name and description can be anything.</li><li>In <strong>Redirect URIs</strong> add exactly: <code>http://127.0.0.1:8888/callback</code></li><li>Save. Open the app, then click <strong>Settings</strong> to copy your Client ID and Client Secret.</li>',
     'help.obs.title': 'Step 2 · Enable OBS WebSocket',
     'help.obs.body': '<li>Open OBS Studio.</li><li>Top menu: <strong>Tools → WebSocket Server Settings</strong>.</li><li>Check <strong>Enable WebSocket server</strong>.</li><li>Set a server password and note it down. Default port is <code>4455</code>.</li><li>Click OK.</li>',
     'help.source.title': 'Step 3 · Add the text source',
@@ -127,7 +158,7 @@ const HELP_I18N = {
     'help.format.list': '<li><code>{trackName}</code> &mdash; current track title</li><li><code>{artistName}</code> &mdash; artist or comma-separated artists</li>',
     'help.format.example': 'Example: <code>♫ {trackName} by {artistName}</code>',
     'help.troubleshoot.title': 'Troubleshooting',
-    'help.troubleshoot.body': '<dt>OBS source does not update</dt><dd>Confirm the source name in OBS matches the one configured in the app exactly, including capitalization.</dd><dt>OBS connection fails</dt><dd>Check that OBS WebSocket is enabled, the password matches, and Windows Firewall is not blocking port 4455.</dd><dt>Spotify authorization fails</dt><dd>Verify the redirect URI in your Spotify Developer dashboard is exactly <code>http://localhost:8888/callback</code>, no trailing slash.</dd><dt>"Token expired" keeps appearing</dt><dd>The app auto-refreshes tokens 5 minutes before expiry. If errors persist, go to Settings → Spotify and re-authorize.</dd><dt>App icon stays grey in tray</dt><dd>Polling is paused, no Spotify track is playing, or the Spotify connection dropped. Resume polling from the sidebar footer.</dd>',
+    'help.troubleshoot.body': '<dt>OBS source does not update</dt><dd>Confirm the source name in OBS matches the one configured in the app exactly, including capitalization.</dd><dt>OBS connection fails</dt><dd>Check that OBS WebSocket is enabled, the password matches, and Windows Firewall is not blocking port 4455.</dd><dt>Spotify authorization fails</dt><dd>Verify the redirect URI in your Spotify Developer dashboard is exactly <code>http://127.0.0.1:8888/callback</code>, no trailing slash.</dd><dt>"Token expired" keeps appearing</dt><dd>The app auto-refreshes tokens 5 minutes before expiry. If errors persist, go to Settings → Spotify and re-authorize.</dd><dt>App icon stays grey in tray</dt><dd>Polling is paused, no Spotify track is playing, or the Spotify connection dropped. Resume polling from the sidebar footer.</dd>',
     'help.logs.title': 'Logs & reporting bugs',
     'help.logs.body': 'Detailed logs are stored at <code>%APPDATA%\\TrackCast\\logs\\main.log</code>. Include the last 100 lines when reporting an issue on GitHub.',
   },
@@ -137,7 +168,7 @@ const HELP_I18N = {
     'help.quickstart.title': 'Inicio rápido',
     'help.quickstart.body': '<li>Creá una app gratis en Spotify Developer y copiá su Client ID y Secret.</li><li>Activá OBS WebSocket (menú Tools dentro de OBS Studio).</li><li>Ejecutá esta app y seguí el wizard. Listo.</li>',
     'help.spotify.title': 'Paso 1 · Crear una app en Spotify Developer',
-    'help.spotify.body': '<li>Andá a <strong>developer.spotify.com/dashboard</strong> e iniciá sesión con tu cuenta de Spotify.</li><li>Hacé clic en <strong>Create app</strong>. Nombre y descripción pueden ser cualquier cosa.</li><li>En <strong>Redirect URIs</strong> agregá exactamente: <code>http://localhost:8888/callback</code></li><li>Guardá. Abrí la app y entrá en <strong>Settings</strong> para copiar Client ID y Client Secret.</li>',
+    'help.spotify.body': '<li>Andá a <strong>developer.spotify.com/dashboard</strong> e iniciá sesión con tu cuenta de Spotify.</li><li>Hacé clic en <strong>Create app</strong>. Nombre y descripción pueden ser cualquier cosa.</li><li>En <strong>Redirect URIs</strong> agregá exactamente: <code>http://127.0.0.1:8888/callback</code></li><li>Guardá. Abrí la app y entrá en <strong>Settings</strong> para copiar Client ID y Client Secret.</li>',
     'help.obs.title': 'Paso 2 · Habilitar OBS WebSocket',
     'help.obs.body': '<li>Abrí OBS Studio.</li><li>Menú superior: <strong>Tools → WebSocket Server Settings</strong>.</li><li>Marcá <strong>Enable WebSocket server</strong>.</li><li>Definí un password de servidor y anotalo. El puerto por defecto es <code>4455</code>.</li><li>Clic en OK.</li>',
     'help.source.title': 'Paso 3 · Agregar el text source',
@@ -147,7 +178,7 @@ const HELP_I18N = {
     'help.format.list': '<li><code>{trackName}</code> &mdash; título del track actual</li><li><code>{artistName}</code> &mdash; artista o artistas separados por coma</li>',
     'help.format.example': 'Ejemplo: <code>♫ {trackName} por {artistName}</code>',
     'help.troubleshoot.title': 'Solución de problemas',
-    'help.troubleshoot.body': '<dt>El source de OBS no se actualiza</dt><dd>Confirmá que el nombre del source en OBS coincide exactamente con el configurado en la app, mayúsculas incluidas.</dd><dt>Falla la conexión a OBS</dt><dd>Verificá que OBS WebSocket esté habilitado, que el password coincida, y que el Firewall de Windows no esté bloqueando el puerto 4455.</dd><dt>Falla la autorización de Spotify</dt><dd>Verificá que el redirect URI en tu Spotify Developer dashboard sea exactamente <code>http://localhost:8888/callback</code>, sin slash al final.</dd><dt>Aparece "Token expired" todo el tiempo</dt><dd>La app refresca tokens automáticamente 5 minutos antes de que expiren. Si persiste, andá a Settings → Spotify y re-autorizá.</dd><dt>El ícono del tray queda gris</dt><dd>El polling está pausado, no hay track sonando en Spotify, o se cayó la conexión. Reanudá el polling desde el footer del sidebar.</dd>',
+    'help.troubleshoot.body': '<dt>El source de OBS no se actualiza</dt><dd>Confirmá que el nombre del source en OBS coincide exactamente con el configurado en la app, mayúsculas incluidas.</dd><dt>Falla la conexión a OBS</dt><dd>Verificá que OBS WebSocket esté habilitado, que el password coincida, y que el Firewall de Windows no esté bloqueando el puerto 4455.</dd><dt>Falla la autorización de Spotify</dt><dd>Verificá que el redirect URI en tu Spotify Developer dashboard sea exactamente <code>http://127.0.0.1:8888/callback</code>, sin slash al final.</dd><dt>Aparece "Token expired" todo el tiempo</dt><dd>La app refresca tokens automáticamente 5 minutos antes de que expiren. Si persiste, andá a Settings → Spotify y re-autorizá.</dd><dt>El ícono del tray queda gris</dt><dd>El polling está pausado, no hay track sonando en Spotify, o se cayó la conexión. Reanudá el polling desde el footer del sidebar.</dd>',
     'help.logs.title': 'Logs y reportar bugs',
     'help.logs.body': 'Los logs detallados están en <code>%APPDATA%\\TrackCast\\logs\\main.log</code>. Adjuntá las últimas 100 líneas cuando reportes un bug en GitHub.',
   },
@@ -203,27 +234,47 @@ function setupSidebarListeners() {
   }
 }
 
+const STATUS_LABELS = {
+  spotify: { ok: 'Playing', idle: 'Waiting', error: 'Error' },
+  obs: { ok: 'Connected', idle: 'Waiting', error: 'Offline' },
+};
+
 function updatePollingLabel(enabled) {
+  isPollingEnabled = enabled;
   const btn = document.getElementById('btn-sidebar-polling');
   const label = document.getElementById('sidebar-polling-label');
   if (!btn || !label) return;
-  btn.classList.toggle('is-paused', !enabled);
-  label.textContent = enabled ? 'Polling on' : 'Polling paused';
+  btn.setAttribute('aria-checked', String(enabled));
+  label.textContent = enabled ? 'Tracking on' : 'Tracking paused';
+  updateStatusSummary();
 }
 
 function updateFooterStatus(service, state) {
+  let normalized = 'idle';
+  if (state === 'ok' || state === 'connected' || state === 'playing') normalized = 'ok';
+  else if (state === 'error') normalized = 'error';
+  connectionState[service] = normalized;
+
   const root = document.getElementById(`footer-${service}`);
   if (!root) return;
   const dot = root.querySelector('.status-dot');
-  if (!dot) return;
   dot.classList.remove('status-dot--idle', 'status-dot--ok', 'status-dot--error');
-  if (state === 'ok' || state === 'connected' || state === 'playing') {
-    dot.classList.add('status-dot--ok');
-  } else if (state === 'error') {
-    dot.classList.add('status-dot--error');
-  } else {
-    dot.classList.add('status-dot--idle');
-  }
+  dot.classList.add(`status-dot--${normalized}`);
+  document.getElementById(`footer-${service}-state`).textContent = STATUS_LABELS[service][normalized];
+  updateStatusSummary();
+}
+
+function updateStatusSummary() {
+  const summary = document.getElementById('status-summary');
+  if (!summary) return;
+
+  let text = 'Ready to track';
+  if (!isPollingEnabled) text = 'Tracking paused';
+  else if (connectionState.spotify === 'error') text = 'Spotify needs attention';
+  else if (connectionState.obs === 'error') text = 'OBS is offline';
+  else if (connectionState.spotify === 'ok' && connectionState.obs === 'ok') text = 'Live on OBS';
+
+  if (summary.textContent !== text) summary.textContent = text;
 }
 
 // ─────────────────────────────────────────────────────────────
@@ -238,15 +289,18 @@ function setupWizardListeners() {
 
   // Spotify step
   document.getElementById('btn-open-spotify-dev').addEventListener('click', () => {
-    window.api.openExternal('https://developer.spotify.com/dashboard');
+    window.api.openExternal(SPOTIFY_DASHBOARD_URL);
   });
 
   document.getElementById('btn-spotify-back').addEventListener('click', () => {
     showStep('welcome');
   });
 
-  document.getElementById('spotify-client-id').addEventListener('input', checkSpotifyCredentials);
-  document.getElementById('spotify-client-secret').addEventListener('input', checkSpotifyCredentials);
+  ['spotify-client-id', 'spotify-client-secret'].forEach((id) => {
+    const input = document.getElementById(id);
+    input.addEventListener('input', checkSpotifyCredentials);
+    input.addEventListener('blur', () => validateCredentialInput(input));
+  });
 
   document.getElementById('btn-authorize-spotify').addEventListener('click', startSpotifyAuth);
 
@@ -287,7 +341,7 @@ function setupWizardListeners() {
   });
 
   document.getElementById('polling-interval').addEventListener('input', (e) => {
-    updateIntervalDisplay('polling-interval-display', parseInt(e.target.value));
+    updateIntervalDisplay('polling-interval-display', parseInt(e.target.value, 10));
   });
 
   document.getElementById('btn-behavior-next').addEventListener('click', async () => {
@@ -303,15 +357,7 @@ function setupWizardListeners() {
     updatePollingButton();
   });
 
-  document.getElementById('btn-open-settings').addEventListener('click', () => {
-    enableAppShell();
-    setupSidebarListeners();
-    setupHelpLanguageToggle();
-    loadSettingsValues();
-    setupSettingsListeners();
-    showView('home');
-    updatePollingLabel(config.polling.enabled !== false);
-  });
+  document.getElementById('btn-open-settings').addEventListener('click', openAppShell);
 
   document.getElementById('btn-minimize-to-tray').addEventListener('click', () => {
     window.close();
@@ -325,16 +371,14 @@ function setupWizardListeners() {
 }
 
 function initSpotifyStep() {
-  if (config.spotify.clientId) {
-    document.getElementById('spotify-client-id').value = config.spotify.clientId;
-  }
-  if (config.spotify.clientSecret) {
-    document.getElementById('spotify-client-secret').value = config.spotify.clientSecret;
-  }
-  if (config.spotify.redirectUri) {
-    document.getElementById('spotify-redirect-uri').value = config.spotify.redirectUri;
-  }
-  document.getElementById('redirect-uri-display').textContent = config.spotify.redirectUri;
+  document.getElementById('copy-app-name').textContent = SPOTIFY_APP_NAME;
+  document.getElementById('copy-app-description').textContent = SPOTIFY_APP_DESCRIPTION;
+  document.getElementById('copy-website').textContent = PROJECT_URL;
+  document.getElementById('spotify-redirect-uri').textContent = config.spotify.redirectUri;
+  document.getElementById('spotify-client-id').value = config.spotify.clientId || '';
+  document.getElementById('spotify-client-secret').value = config.spotify.clientSecret || '';
+  validateCredentialInput(document.getElementById('spotify-client-id'));
+  validateCredentialInput(document.getElementById('spotify-client-secret'));
   checkSpotifyCredentials();
 }
 
@@ -367,7 +411,7 @@ function initBehaviorStep() {
 
 function saveOBSConfig() {
   config.obs.host = document.getElementById('obs-host').value;
-  config.obs.port = parseInt(document.getElementById('obs-port').value);
+  config.obs.port = parseInt(document.getElementById('obs-port').value, 10);
   config.obs.password = document.getElementById('obs-password').value;
   config.obs.textSourceName = document.getElementById('obs-source-name').value;
 }
@@ -379,7 +423,7 @@ function saveOverlayConfig() {
 }
 
 function saveBehaviorConfig() {
-  config.polling.intervalMs = parseInt(document.getElementById('polling-interval').value);
+  config.polling.intervalMs = parseInt(document.getElementById('polling-interval').value, 10);
   config.behavior.startMinimized = document.getElementById('behavior-start-minimized').checked;
   config.behavior.minimizeToTray = document.getElementById('behavior-minimize-to-tray').checked;
   config.behavior.autoReconnect = document.getElementById('behavior-auto-reconnect').checked;
@@ -391,124 +435,243 @@ function saveBehaviorConfig() {
 
 async function finishSetup() {
   // Save Spotify credentials
-  config.spotify.clientId = document.getElementById('spotify-client-id').value;
-  config.spotify.clientSecret = document.getElementById('spotify-client-secret').value;
-  config.spotify.redirectUri = document.getElementById('spotify-redirect-uri').value;
-  
+  config.spotify.clientId = document.getElementById('spotify-client-id').value.trim();
+  config.spotify.clientSecret = document.getElementById('spotify-client-secret').value.trim();
+
   config.setup.completed = true;
   
   await window.api.saveConfig(config);
 }
 
-async function checkSpotifyCredentials() {
-  const clientId = document.getElementById('spotify-client-id').value.trim();
-  const clientSecret = document.getElementById('spotify-client-secret').value.trim();
-  const nextBtn = document.getElementById('btn-spotify-next');
-  const authSection = document.getElementById('spotify-authorize-section');
+// ─────────────────────────────────────────────────────────────
+// Credential validation
+// ─────────────────────────────────────────────────────────────
 
-  if (clientId && clientSecret) {
-    config.spotify.clientId = clientId;
-    config.spotify.clientSecret = clientSecret;
-    nextBtn.disabled = !config.spotify.refreshToken;
-    authSection.classList.remove('hidden');
-  } else {
-    nextBtn.disabled = true;
-    authSection.classList.add('hidden');
+function isValidCredential(value) {
+  return SPOTIFY_CREDENTIAL_PATTERN.test(value.trim());
+}
+
+function credentialErrorMessage(value, label, source) {
+  const prefix = source === 'clipboard' ? 'Your clipboard contains' : 'This is';
+  if (URL_PATTERN.test(value.trim())) {
+    return `${prefix} a URL, not a ${label}. Copy the ${label} from your app's Settings in the Spotify Dashboard.`;
   }
+  if (source === 'clipboard') {
+    return `Your clipboard doesn't contain a ${label}. Copy it from your app's Settings in the Spotify Dashboard.`;
+  }
+  return `A ${label} is 32 letters and numbers. Copy it from your app's Settings in the Spotify Dashboard.`;
+}
+
+function setFieldError(input, message) {
+  const error = document.getElementById(`${input.id}-error`);
+  const group = input.closest('.input-group');
+  if (error) error.textContent = message;
+  if (group) group.classList.toggle('is-invalid', Boolean(message));
+  input.setAttribute('aria-invalid', String(Boolean(message)));
+}
+
+// Shows an error for a non-empty invalid credential; returns true when the field is valid.
+function validateCredentialInput(input) {
+  const value = input.value.trim();
+  if (!value) {
+    setFieldError(input, '');
+    return false;
+  }
+  const valid = isValidCredential(value);
+  setFieldError(input, valid ? '' : credentialErrorMessage(value, input.dataset.credential, 'field'));
+  return valid;
+}
+
+function checkSpotifyCredentials() {
+  const idInput = document.getElementById('spotify-client-id');
+  const secretInput = document.getElementById('spotify-client-secret');
+  [idInput, secretInput].forEach((input) => {
+    if (isValidCredential(input.value)) setFieldError(input, '');
+  });
+  const hasCredentials = isValidCredential(idInput.value) && isValidCredential(secretInput.value);
+  const isAuthorized = Boolean(config.spotify.refreshToken);
+  const authorizeBtn = document.getElementById('btn-authorize-spotify');
+
+  authorizeBtn.disabled = !hasCredentials;
+  authorizeBtn.textContent = isAuthorized ? 'Authorize again' : 'Authorize with Spotify';
+  document.getElementById('btn-spotify-next').disabled = !isAuthorized;
+  document.getElementById('spotify-auth-section').hidden = !isAuthorized;
 }
 
 // ─────────────────────────────────────────────────────────────
 // Spotify Auth
 // ─────────────────────────────────────────────────────────────
 
-async function startSpotifyAuth() {
-  const statusEl = document.getElementById('auth-status');
-  statusEl.textContent = 'Waiting for authorization...';
-  statusEl.className = 'auth-status-text';
+function setAuthStatus(statusEl, message, state) {
+  statusEl.textContent = message;
+  statusEl.className = state ? `auth-status-text ${state}` : 'auth-status-text';
+}
+
+async function runSpotifyAuthorization(credentials, statusEl, button) {
+  setAuthStatus(statusEl, 'Waiting for authorization. Approve TrackCast in the browser window that just opened.');
+  if (button) button.disabled = true;
 
   try {
-    // First save the current credentials
-    config.spotify.clientId = document.getElementById('spotify-client-id').value.trim();
-    config.spotify.clientSecret = document.getElementById('spotify-client-secret').value.trim();
-    config.spotify.redirectUri = document.getElementById('spotify-redirect-uri').value.trim();
-    await window.api.saveConfig(config);
-
-    // Build the auth URL
-    const scopes = 'user-read-currently-playing user-read-playback-state';
-    const params = new URLSearchParams({
-      client_id: config.spotify.clientId,
-      response_type: 'code',
-      redirect_uri: config.spotify.redirectUri,
-      scope: scopes,
-    });
-    const authUrl = 'https://accounts.spotify.com/authorize?' + params.toString();
-
-    // Start auth server FIRST, then open browser
-    window.api.startAuthServer(config).then(async (authCode) => {
-      // Auth server received the code
-      await exchangeCodeForToken(authCode);
-    }).catch((err) => {
-      statusEl.textContent = 'Error: ' + err.message;
-      statusEl.className = 'auth-status-text error';
-    });
-
-    // Open auth URL in browser
-    window.api.openExternal(authUrl);
-
+    const result = await window.api.authorizeSpotify(credentials);
+    if (!result.success) {
+      setAuthStatus(statusEl, `Authorization failed: ${result.error}`, 'error');
+      return false;
+    }
+    config = result.config;
+    setAuthStatus(statusEl, 'Authorization successful!', 'success');
+    return true;
   } catch (error) {
-    statusEl.textContent = 'Error: ' + error.message;
-    statusEl.className = 'auth-status-text error';
+    setAuthStatus(statusEl, `Authorization failed: ${error.message}`, 'error');
+    return false;
+  } finally {
+    if (button) button.disabled = false;
   }
 }
 
-async function exchangeCodeForToken(code) {
-  try {
-    const response = await fetch('https://accounts.spotify.com/api/token', {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/x-www-form-urlencoded',
-        'Authorization': 'Basic ' + btoa(config.spotify.clientId + ':' + config.spotify.clientSecret),
-      },
-      body: new URLSearchParams({
-        grant_type: 'authorization_code',
-        code: code,
-        redirect_uri: config.spotify.redirectUri,
-      }),
-    });
+async function startSpotifyAuth() {
+  const authorized = await runSpotifyAuthorization(
+    {
+      clientId: document.getElementById('spotify-client-id').value.trim(),
+      clientSecret: document.getElementById('spotify-client-secret').value.trim(),
+      redirectUri: config.spotify.redirectUri,
+    },
+    document.getElementById('auth-status'),
+    document.getElementById('btn-authorize-spotify'),
+  );
+  if (authorized) setAuthStatus(document.getElementById('auth-status'), '');
+  checkSpotifyCredentials();
+}
 
-    if (!response.ok) {
-      throw new Error('Failed to exchange code for token');
+async function startSettingsSpotifyAuth() {
+  const idValid = validateCredentialInput(document.getElementById('settings-spotify-client-id'));
+  const secretValid = validateCredentialInput(document.getElementById('settings-spotify-client-secret'));
+  if (!idValid || !secretValid) {
+    setAuthStatus(document.getElementById('settings-auth-status'), 'Fix the Client ID and Client secret before authorizing.', 'error');
+    return;
+  }
+
+  const authorized = await runSpotifyAuthorization(
+    {
+      clientId: document.getElementById('settings-spotify-client-id').value.trim(),
+      clientSecret: document.getElementById('settings-spotify-client-secret').value.trim(),
+      redirectUri: document.getElementById('settings-spotify-redirect-uri').value.trim(),
+    },
+    document.getElementById('settings-auth-status'),
+    document.getElementById('btn-reauthorize-spotify'),
+  );
+  if (authorized) renderRedirectUriNotice();
+}
+
+// ─────────────────────────────────────────────────────────────
+// Redirect URI migration notice
+// ─────────────────────────────────────────────────────────────
+
+function renderRedirectUriNotice() {
+  const notice = document.getElementById('redirect-uri-notice');
+  if (!notice) return;
+  notice.hidden = !config.spotify.redirectUriMigrated;
+  document.getElementById('notice-redirect-uri').textContent = config.spotify.redirectUri;
+}
+
+function showCopiedFeedback(button) {
+  const label = button.querySelector('.copy-btn__label') || button;
+  if (!button.dataset.label) button.dataset.label = label.textContent;
+  clearTimeout(Number(button.dataset.resetTimer));
+  label.textContent = 'Copied';
+  button.classList.add('is-copied');
+  announce('Copied to clipboard');
+  button.dataset.resetTimer = String(setTimeout(() => {
+    label.textContent = button.dataset.label;
+    button.classList.remove('is-copied');
+  }, COPY_FEEDBACK_MS));
+}
+
+function announce(message) {
+  const announcer = document.getElementById('copy-announcer');
+  if (!announcer) return;
+  announcer.textContent = '';
+  requestAnimationFrame(() => { announcer.textContent = message; });
+}
+
+// Copy, paste and show/hide buttons are declared in markup through data attributes.
+function setupFieldHelpers() {
+  document.addEventListener('click', async (event) => {
+    const copyBtn = event.target.closest('[data-copy-target], [data-copy-input]');
+    if (copyBtn) {
+      const text = copyBtn.dataset.copyTarget
+        ? document.getElementById(copyBtn.dataset.copyTarget).textContent
+        : document.getElementById(copyBtn.dataset.copyInput).value;
+      await window.api.copyText(text.trim());
+      showCopiedFeedback(copyBtn);
+      return;
     }
 
-    const data = await response.json();
-    
-    config.spotify.refreshToken = data.refresh_token;
-    config.spotify.accessToken = data.access_token;
-    config.spotify.accessTokenExpiresAt = Date.now() + (data.expires_in * 1000);
-    
+    const pasteBtn = event.target.closest('[data-paste-target]');
+    if (pasteBtn) {
+      const input = document.getElementById(pasteBtn.dataset.pasteTarget);
+      const text = (await window.api.readClipboardText()).trim();
+      if (!text) {
+        if (input.dataset.credential) setFieldError(input, `Your clipboard is empty. Copy the ${input.dataset.credential} first.`);
+        announce('Clipboard is empty');
+        return;
+      }
+      if (input.dataset.credential && !isValidCredential(text)) {
+        setFieldError(input, credentialErrorMessage(text, input.dataset.credential, 'clipboard'));
+        input.focus();
+        return;
+      }
+      input.value = text;
+      input.dispatchEvent(new Event('input', { bubbles: true }));
+      input.focus();
+      announce('Pasted from clipboard');
+      return;
+    }
+
+    const revealBtn = event.target.closest('[data-reveal-target]');
+    if (revealBtn) {
+      const input = document.getElementById(revealBtn.dataset.revealTarget);
+      const reveal = input.type === 'password';
+      const label = revealBtn.getAttribute('aria-label');
+      input.type = reveal ? 'text' : 'password';
+      revealBtn.setAttribute('aria-pressed', String(reveal));
+      revealBtn.setAttribute('aria-label', reveal ? label.replace('Show', 'Hide') : label.replace('Hide', 'Show'));
+    }
+  });
+}
+
+function setupRedirectUriNotice() {
+  const copyBtn = document.getElementById('btn-notice-copy-uri');
+  const reauthBtn = document.getElementById('btn-notice-reauthorize');
+
+  copyBtn.addEventListener('click', async () => {
+    await window.api.copyText(config.spotify.redirectUri);
+    showCopiedFeedback(copyBtn);
+  });
+
+  document.getElementById('btn-notice-open-dashboard').addEventListener('click', () => {
+    window.api.openExternal(SPOTIFY_DASHBOARD_URL);
+  });
+
+  reauthBtn.addEventListener('click', async () => {
+    const authorized = await runSpotifyAuthorization(
+      {
+        clientId: config.spotify.clientId,
+        clientSecret: config.spotify.clientSecret,
+        redirectUri: config.spotify.redirectUri,
+      },
+      document.getElementById('notice-auth-status'),
+      reauthBtn,
+    );
+    if (authorized) renderRedirectUriNotice();
+  });
+
+  document.getElementById('btn-notice-dismiss').addEventListener('click', async () => {
+    config.spotify.redirectUriMigrated = false;
     await window.api.saveConfig(config);
+    renderRedirectUriNotice();
+  });
 
-    document.getElementById('spotify-test-result').textContent = 'Authorized!';
-    document.getElementById('spotify-test-result').className = 'test-result success';
-    document.getElementById('btn-spotify-next').disabled = false;
-    
-    const statusEl = document.getElementById('auth-status');
-    statusEl.textContent = 'Authorization successful!';
-    statusEl.className = 'auth-status-text success';
-
-    // Show connected state
-    document.getElementById('spotify-auth-section').classList.remove('hidden');
-    document.getElementById('spotify-authorize-section').classList.add('hidden');
-    document.getElementById('spotify-not-configured').classList.add('hidden');
-
-    return data;
-
-  } catch (error) {
-    const statusEl = document.getElementById('auth-status');
-    statusEl.textContent = 'Error: ' + error.message;
-    statusEl.className = 'auth-status-text error';
-    throw error;
-  }
+  renderRedirectUriNotice();
 }
 
 // ─────────────────────────────────────────────────────────────
@@ -524,7 +687,7 @@ async function testOBSConnection() {
   await window.api.saveConfig(config);
   
   btn.disabled = true;
-  btn.textContent = 'Testing...';
+  btn.textContent = 'Testing…';
   resultEl.textContent = '';
   resultEl.className = 'test-result';
 
@@ -534,20 +697,18 @@ async function testOBSConnection() {
     if (result.success) {
       resultEl.textContent = 'Connected!';
       resultEl.className = 'test-result success';
-      updateStatusIndicator('obs', 'connected');
       const panel = document.getElementById('source-panel');
       if (panel) panel.hidden = false;
     } else {
       resultEl.textContent = 'Failed: ' + result.error;
       resultEl.className = 'test-result error';
-      updateStatusIndicator('obs', 'error');
     }
   } catch (error) {
     resultEl.textContent = 'Error: ' + error.message;
     resultEl.className = 'test-result error';
   } finally {
     btn.disabled = false;
-    btn.textContent = 'Test Connection';
+    btn.textContent = 'Test connection';
   }
 }
 
@@ -572,7 +733,7 @@ async function handleSourceCheck() {
   }
 
   btn.disabled = true;
-  btn.textContent = 'Checking...';
+  btn.textContent = 'Checking…';
   renderSourceResult(null);
 
   const response = await window.api.obsCheckSource(sourceName);
@@ -603,7 +764,7 @@ function renderSourceResult(data, sourceName) {
   if (data.exists) {
     result.className = 'source-result source-result--ok';
     const scene = data.sceneName ? ` in scene <strong>${escapeHtml(data.sceneName)}</strong>` : '';
-    result.innerHTML = `<div class="source-result__row">Source found${scene}. You are ready.</div>`;
+    result.innerHTML = `<div class="source-result__row">Source found${scene}. You're ready.</div>`;
     return;
   }
 
@@ -614,8 +775,8 @@ function renderSourceResult(data, sourceName) {
         Not found. Did you mean <strong>${escapeHtml(data.suggestion)}</strong>?
       </div>
       <div class="source-result__action">
-        <button class="btn btn--secondary" id="btn-use-suggestion" type="button">Use this name</button>
-        <button class="btn btn--secondary" id="btn-create-source" type="button">Create new source</button>
+        <button class="btn btn--secondary btn--sm" id="btn-use-suggestion" type="button">Use this name</button>
+        <button class="btn btn--ghost btn--sm" id="btn-create-source" type="button">Create new source</button>
       </div>
     `;
     document.getElementById('btn-use-suggestion')?.addEventListener('click', () => {
@@ -633,7 +794,7 @@ function renderSourceResult(data, sourceName) {
       No source named <strong>${escapeHtml(sourceName)}</strong> in OBS.
     </div>
     <div class="source-result__action">
-      <button class="btn btn--primary" id="btn-create-source" type="button">Create it for me</button>
+      <button class="btn btn--secondary btn--sm" id="btn-create-source" type="button">Create it for me</button>
     </div>
   `;
   document.getElementById('btn-create-source')?.addEventListener('click', () => handleSourceCreate(sourceName));
@@ -641,7 +802,7 @@ function renderSourceResult(data, sourceName) {
 
 async function handleSourceCreate(sourceName) {
   const btn = document.getElementById('btn-create-source');
-  if (btn) { btn.disabled = true; btn.textContent = 'Creating...'; }
+  if (btn) { btn.disabled = true; btn.textContent = 'Creating…'; }
   const response = await window.api.obsCreateSource(sourceName);
   if (btn) { btn.disabled = false; }
 
@@ -663,16 +824,12 @@ function updateOverlayPreview() {
   
   const previewText = document.getElementById('preview-text');
   
-  if (showOnlyPlaying) {
+  if (showOnlyPlaying || !idleText) {
     previewText.textContent = format
       .replace('{trackName}', 'Song Title')
       .replace('{artistName}', 'Artist Name');
-  } else if (idleText) {
-    previewText.textContent = idleText;
   } else {
-    previewText.textContent = format
-      .replace('{trackName}', 'Song Title')
-      .replace('{artistName}', 'Artist Name');
+    previewText.textContent = idleText;
   }
 }
 
@@ -707,27 +864,40 @@ function loadSettingsValues() {
 }
 
 function setupSettingsListeners() {
-  // Close settings
-  document.getElementById('btn-close-settings').addEventListener('click', () => {
-    showStep('complete');
-  });
-
   // Tabs
-  document.querySelectorAll('.tab-btn').forEach(btn => {
-    btn.addEventListener('click', () => {
-      const tabId = btn.dataset.tab;
-      
-      document.querySelectorAll('.tab-btn').forEach(b => b.classList.remove('active'));
-      document.querySelectorAll('.tab-panel').forEach(p => p.classList.remove('active'));
-      
-      btn.classList.add('active');
-      document.getElementById(tabId).classList.add('active');
+  const tabs = [...document.querySelectorAll('.tab-btn')];
+  const selectTab = (btn) => {
+    tabs.forEach((b) => {
+      const selected = b === btn;
+      b.classList.toggle('active', selected);
+      b.setAttribute('aria-selected', String(selected));
+      b.tabIndex = selected ? 0 : -1;
+      document.getElementById(b.dataset.tab).hidden = !selected;
+    });
+    document.getElementById('settings-footer').hidden = ['tab-about', 'tab-logs'].includes(btn.dataset.tab);
+  };
+  tabs.forEach((btn, index) => {
+    btn.addEventListener('click', () => selectTab(btn));
+    btn.addEventListener('keydown', (e) => {
+      if (e.key !== 'ArrowRight' && e.key !== 'ArrowLeft') return;
+      const offset = e.key === 'ArrowRight' ? 1 : tabs.length - 1;
+      const next = tabs[(index + offset) % tabs.length];
+      selectTab(next);
+      next.focus();
     });
   });
 
   // Polling interval
   document.getElementById('settings-polling-interval').addEventListener('input', (e) => {
-    updateIntervalDisplay('settings-polling-display', parseInt(e.target.value));
+    updateIntervalDisplay('settings-polling-display', parseInt(e.target.value, 10));
+  });
+
+  // About
+  window.api.getAppVersion().then((version) => {
+    document.getElementById('app-version').textContent = version;
+  });
+  document.getElementById('btn-open-repo').addEventListener('click', () => {
+    window.api.openExternal(PROJECT_URL);
   });
 
   // Test OBS
@@ -736,7 +906,7 @@ function setupSettingsListeners() {
     await saveSettingsToConfig();
     
     const resultEl = document.getElementById('settings-obs-test-result');
-    resultEl.textContent = 'Testing...';
+    resultEl.textContent = 'Testing…';
     resultEl.className = 'test-result';
     
     try {
@@ -755,8 +925,13 @@ function setupSettingsListeners() {
   });
 
   // Re-authorize Spotify
-  document.getElementById('btn-reauthorize-spotify').addEventListener('click', () => {
-    startSpotifyAuth();
+  document.getElementById('btn-reauthorize-spotify').addEventListener('click', startSettingsSpotifyAuth);
+  ['settings-spotify-client-id', 'settings-spotify-client-secret'].forEach((id) => {
+    const input = document.getElementById(id);
+    input.addEventListener('blur', () => validateCredentialInput(input));
+    input.addEventListener('input', () => {
+      if (isValidCredential(input.value)) setFieldError(input, '');
+    });
   });
 
   // Clear logs
@@ -769,26 +944,50 @@ function setupSettingsListeners() {
   setupUpdaterListeners();
 
   // Save settings
-  document.getElementById('btn-save-settings').addEventListener('click', async () => {
-    await saveSettingsToConfig();
+  const saveBtn = document.getElementById('btn-save-settings');
+  const saveStatus = document.getElementById('settings-save-status');
+  saveBtn.addEventListener('click', async () => {
+    const credentialInputs = ['settings-spotify-client-id', 'settings-spotify-client-secret']
+      .map((id) => document.getElementById(id));
+    const invalid = credentialInputs.filter((input) => input.value.trim() && !validateCredentialInput(input));
+    if (invalid.length > 0) {
+      document.getElementById('tabbtn-spotify').click();
+      invalid[0].focus();
+      saveStatus.textContent = 'Fix the Spotify credentials before saving.';
+      saveStatus.className = 'test-result error';
+      return;
+    }
 
-    // Restart polling with new interval
-    if (config.polling.enabled) {
-      await window.api.stopPolling();
-      await window.api.startPolling();
+    saveBtn.disabled = true;
+    try {
+      await saveSettingsToConfig();
+
+      // Restart polling with new interval
+      if (config.polling.enabled) {
+        await window.api.stopPolling();
+        await window.api.startPolling();
+      }
+      saveStatus.textContent = 'Changes saved';
+      saveStatus.className = 'test-result success';
+    } catch (error) {
+      saveStatus.textContent = `Could not save: ${error.message}`;
+      saveStatus.className = 'test-result error';
+    } finally {
+      saveBtn.disabled = false;
+      setTimeout(() => { saveStatus.textContent = ''; }, SAVE_FEEDBACK_MS);
     }
   });
 }
 
 async function saveSettingsToConfig() {
   // Spotify
-  config.spotify.clientId = document.getElementById('settings-spotify-client-id').value;
-  config.spotify.clientSecret = document.getElementById('settings-spotify-client-secret').value;
+  config.spotify.clientId = document.getElementById('settings-spotify-client-id').value.trim();
+  config.spotify.clientSecret = document.getElementById('settings-spotify-client-secret').value.trim();
   config.spotify.redirectUri = document.getElementById('settings-spotify-redirect-uri').value;
   
   // OBS
   config.obs.host = document.getElementById('settings-obs-host').value;
-  config.obs.port = parseInt(document.getElementById('settings-obs-port').value);
+  config.obs.port = parseInt(document.getElementById('settings-obs-port').value, 10);
   config.obs.password = document.getElementById('settings-obs-password').value;
   config.obs.textSourceName = document.getElementById('settings-obs-source-name').value;
   
@@ -798,7 +997,7 @@ async function saveSettingsToConfig() {
   config.overlay.showOnlyWhenPlaying = document.getElementById('settings-overlay-show-only').checked;
   
   // Behavior
-  config.polling.intervalMs = parseInt(document.getElementById('settings-polling-interval').value);
+  config.polling.intervalMs = parseInt(document.getElementById('settings-polling-interval').value, 10);
   config.behavior.startMinimized = document.getElementById('settings-start-minimized').checked;
   config.behavior.minimizeToTray = document.getElementById('settings-minimize-to-tray').checked;
   config.behavior.autoReconnect = document.getElementById('settings-auto-reconnect').checked;
@@ -822,17 +1021,14 @@ function setupStatusListeners() {
 
   window.api.onOBSStatus((status) => {
     const state = status.connected ? 'ok' : 'error';
-    updateStatusIndicator('obs', status.connected ? 'connected' : 'error');
     updateFooterStatus('obs', state);
   });
 
   window.api.onOBSError(() => {
-    updateStatusIndicator('obs', 'error');
     updateFooterStatus('obs', 'error');
   });
 
   window.api.onSpotifyError(() => {
-    updateStatusIndicator('spotify', 'error');
     updateFooterStatus('spotify', 'error');
   });
 
@@ -884,37 +1080,17 @@ function escapeHtml(text) {
   return div.innerHTML;
 }
 
-function updateStatusIndicator(service, status) {
-  const indicator = document.getElementById(`${service}-status`);
-  if (!indicator) return;
-  
-  indicator.className = 'status-indicator';
-  
-  switch (status) {
-    case 'connected':
-    case 'playing':
-      indicator.classList.add('status-connected');
-      break;
-    case 'error':
-      indicator.classList.add('status-error');
-      break;
-    default:
-      indicator.classList.add('status-idle');
-  }
-}
-
 function updateTrackDisplay(track) {
   if (currentStep === 'complete') {
     const trackNameEl = document.getElementById('complete-track-name');
     const artistEl = document.getElementById('complete-track-artist');
     if (trackNameEl) {
-      trackNameEl.textContent = track ? track.trackName : 'No track playing';
+      trackNameEl.textContent = track ? track.trackName : 'Waiting for a track…';
       if (artistEl) artistEl.textContent = track ? track.artistName : '';
     }
   }
 
   renderNowPlaying(track);
-  updateStatusIndicator('spotify', track ? 'playing' : 'idle');
 }
 
 // ─────────────────────────────────────────────────────────────
@@ -1039,7 +1215,7 @@ function stopProgressTicker() {
 function updatePollingButton() {
   const btn = document.getElementById('btn-toggle-polling');
   if (btn) {
-    btn.textContent = isPollingEnabled ? 'Pause Tracking' : 'Resume Tracking';
+    btn.textContent = isPollingEnabled ? 'Pause tracking' : 'Resume tracking';
   }
 }
 
@@ -1050,7 +1226,7 @@ function updatePollingButton() {
 function updateIntervalDisplay(elementId, value) {
   const el = document.getElementById(elementId);
   if (el) {
-    el.textContent = value + 'ms';
+    el.textContent = `${Math.round(value / 1000)} s`;
   }
 }
 
@@ -1066,77 +1242,52 @@ function setupGlobalListeners() {
 // ─────────────────────────────────────────────────────────────
 
 function setupUpdaterListeners() {
-  // Check for updates button
   const checkBtn = document.getElementById('btn-check-updates');
   const resultEl = document.getElementById('update-check-result');
   const banner = document.getElementById('update-banner');
   const bannerText = document.getElementById('update-banner-text');
   const installBtn = document.getElementById('btn-install-update');
-  const updateStatus = document.getElementById('update-status');
 
-  if (checkBtn) {
-    checkBtn.addEventListener('click', async () => {
-      checkBtn.disabled = true;
-      checkBtn.textContent = 'Checking...';
-      resultEl.textContent = '';
-      resultEl.className = 'update-result';
+  const setResult = (message, state) => {
+    resultEl.textContent = message;
+    resultEl.className = state ? `test-result ${state}` : 'test-result';
+  };
 
-      try {
-        const result = await window.api.checkForUpdates();
+  checkBtn.addEventListener('click', async () => {
+    checkBtn.disabled = true;
+    checkBtn.textContent = 'Checking…';
+    setResult('');
 
-        if (result.error) {
-          resultEl.textContent = 'Error: ' + result.error;
-          resultEl.className = 'update-result error';
-        } else if (result.downloaded) {
-          resultEl.textContent = 'Update ready! Restart to apply.';
-          resultEl.className = 'update-result success';
-          showUpdateBanner(banner, bannerText, 'Update ready! Restart to apply.');
-          updateStatus.classList.remove('hidden', 'status-idle');
-          updateStatus.classList.add('status-connected');
-        } else if (result.available) {
-          resultEl.textContent = 'Downloading...';
-          resultEl.className = 'update-result info';
-        } else {
-          resultEl.textContent = 'Up to date';
-          resultEl.className = 'update-result success';
-        }
-      } catch (err) {
-        resultEl.textContent = 'Error: ' + err.message;
-        resultEl.className = 'update-result error';
-      } finally {
-        checkBtn.disabled = false;
-        checkBtn.textContent = 'Check for Updates';
+    try {
+      const result = await window.api.checkForUpdates();
+
+      if (result.error) {
+        setResult(`Could not check for updates: ${result.error}`, 'error');
+      } else if (result.downloaded) {
+        showUpdateBanner(banner, bannerText, 'Update ready. Restart to apply it.');
+      } else if (result.available) {
+        setResult('Downloading the update…');
+      } else {
+        setResult("You're on the latest version", 'success');
       }
-    });
-  }
-
-  // Install update button
-  if (installBtn) {
-    installBtn.addEventListener('click', async () => {
-      await window.api.installUpdate();
-    });
-  }
-
-  // Listen for updater status messages
-  window.api.onUpdaterStatus((message) => {
-    if (message) {
-      updateStatus.classList.remove('hidden', 'status-idle');
-      updateStatus.classList.add('status-connected');
-      document.getElementById('update-status-text').textContent = 'Update';
+    } catch (err) {
+      setResult(`Could not check for updates: ${err.message}`, 'error');
+    } finally {
+      checkBtn.disabled = false;
+      checkBtn.textContent = 'Check for updates';
     }
   });
 
-  // Listen for update downloaded event
+  installBtn.addEventListener('click', async () => {
+    await window.api.installUpdate();
+  });
+
   window.api.onUpdateDownloaded((info) => {
-    showUpdateBanner(banner, bannerText, `v${info.version} ready. Restart to apply.`);
-    updateStatus.classList.remove('hidden', 'status-idle');
-    updateStatus.classList.add('status-connected');
+    showUpdateBanner(banner, bannerText, `Version ${info.version} is ready. Restart to apply it.`);
   });
 }
 
 function showUpdateBanner(banner, textEl, message) {
-  if (banner && textEl) {
-    textEl.textContent = message;
-    banner.classList.remove('hidden');
-  }
+  textEl.textContent = message;
+  banner.hidden = false;
 }

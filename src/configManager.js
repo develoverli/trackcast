@@ -19,12 +19,20 @@ const USER_DATA_DIR = resolveUserDataDir();
 const CONFIG_PATH = join(USER_DATA_DIR, 'config.json');
 const LEGACY_CONFIG_PATH = join(__dirname, '..', 'config.json');
 
+// Spotify rejects `localhost` redirect URIs; loopback redirects must use an explicit IP.
+export const SPOTIFY_REDIRECT_URI = 'http://127.0.0.1:8888/callback';
+const LOOPBACK_HOST = '127.0.0.1';
+const LEGACY_LOOPBACK_HOST = 'localhost';
+
 const DEFAULT_CONFIG = {
   version: '1.0.0',
   spotify: {
     clientId: '',
     clientSecret: '',
-    redirectUri: 'http://localhost:8888/callback',
+    redirectUri: SPOTIFY_REDIRECT_URI,
+    // True when a saved `localhost` redirect URI was rewritten and the user still
+    // has to update it in their Spotify app. Cleared on re-authorization or dismiss.
+    redirectUriMigrated: false,
     refreshToken: '',
     accessToken: '',
     accessTokenExpiresAt: 0,
@@ -77,6 +85,15 @@ export function loadConfig() {
       configCache.overlay = { ...DEFAULT_CONFIG.overlay, ...configCache.overlay };
       configCache.behavior = { ...DEFAULT_CONFIG.behavior, ...configCache.behavior };
       configCache.setup = { ...DEFAULT_CONFIG.setup, ...configCache.setup };
+
+      if (migrateLocalhostRedirectUri(configCache)) {
+        try {
+          saveConfig(configCache);
+          console.log('[Config] Migrated Spotify redirect URI to', configCache.spotify.redirectUri);
+        } catch (e) {
+          console.error('[Config] Could not persist redirect URI migration:', e.message);
+        }
+      }
     } catch (e) {
       console.error('[Config] Error reading config.json, using defaults:', e.message);
       configCache = { ...DEFAULT_CONFIG };
@@ -107,6 +124,22 @@ export function updateConfig(partial) {
 
 export function getConfig() {
   return loadConfig();
+}
+
+function migrateLocalhostRedirectUri(config) {
+  let url;
+  try {
+    url = new URL(config.spotify.redirectUri);
+  } catch {
+    return false;
+  }
+  if (url.hostname !== LEGACY_LOOPBACK_HOST) return false;
+
+  url.hostname = LOOPBACK_HOST;
+  config.spotify.redirectUri = url.toString();
+  // Only users who already authorized need to update their Spotify app.
+  config.spotify.redirectUriMigrated = Boolean(config.spotify.refreshToken);
+  return true;
 }
 
 export function resetConfig() {

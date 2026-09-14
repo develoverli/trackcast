@@ -1,112 +1,90 @@
-"""Generate app icon (PNG + ICO) for TrackCast.
+"""Generate app icons (PNG + ICO) and tray icons for TrackCast.
 
-Renders a rounded green square with a stylized note glyph at multiple sizes
-and bundles them into build/icon.ico for electron-builder.
+Renders the app mark (dark tile, green to violet gradient ring, green note glyph)
+at each size and writes:
+  - src/renderer/assets/icon-<size>.png and icon.png   window, taskbar, About
+  - src/renderer/assets/tray/tray-<state>-<size>.png   system tray (idle / playing / error)
+  - build/icon.ico                                      app, installer and uninstaller icon
+
+Requires: Python 3.9+, Pillow 8.1+.
 """
 from pathlib import Path
+
 from PIL import Image, ImageDraw
 
-# Spotify-ish green, slightly darker than #1DB954 so glyph contrast holds.
-BG = (29, 185, 84, 255)        # #1DB954
-FG = (250, 251, 250, 255)      # off-white
-SHADOW = (0, 0, 0, 90)
+from branding import ACCENT, app_mark
 
+ROOT = Path(__file__).resolve().parent.parent
+BUILD_DIR = ROOT / "build"
+ASSETS_DIR = ROOT / "src" / "renderer" / "assets"
+TRAY_DIR = ASSETS_DIR / "tray"
 
-def rounded_mask(size: int, radius: int) -> Image.Image:
-    mask = Image.new("L", (size, size), 0)
-    d = ImageDraw.Draw(mask)
-    d.rounded_rectangle((0, 0, size - 1, size - 1), radius=radius, fill=255)
-    return mask
+SUPERSAMPLE = 8
+ICON_SIZES = [16, 24, 32, 48, 64, 128, 256]
+TRAY_SIZES = [16, 24, 32]
+SMALL_ICON_MAX = 32  # sizes at or below this get a bolder glyph so it stays legible
+
+STATUS_COLORS = {
+    "playing": ACCENT,
+    "idle": (150, 160, 155),
+    "error": (240, 82, 70),
+}
+STATUS_OUTLINE = (12, 16, 14)
 
 
 def render_icon(size: int) -> Image.Image:
-    img = Image.new("RGBA", (size, size), (0, 0, 0, 0))
-    d = ImageDraw.Draw(img)
-
-    # Rounded square base
-    radius = max(int(size * 0.22), 1)
-    d.rounded_rectangle((0, 0, size - 1, size - 1), radius=radius, fill=BG)
-
-    # Note glyph: simplified eighth note (head + stem + flag)
-    # Head: ellipse, lower-left quadrant
-    head_w = int(size * 0.32)
-    head_h = int(size * 0.26)
-    head_x = int(size * 0.22)
-    head_y = int(size * 0.55)
-    d.ellipse((head_x, head_y, head_x + head_w, head_y + head_h), fill=FG)
-
-    # Stem: vertical bar from top of head upward
-    stem_w = max(int(size * 0.06), 1)
-    stem_x = head_x + head_w - stem_w
-    stem_top = int(size * 0.20)
-    stem_bottom = head_y + int(head_h * 0.45)
-    d.rounded_rectangle(
-        (stem_x, stem_top, stem_x + stem_w, stem_bottom),
-        radius=max(int(size * 0.02), 1),
-        fill=FG,
+    """Render the app mark at `size` pixels with supersampling for smooth edges."""
+    canvas = size * SUPERSAMPLE
+    small = size <= SMALL_ICON_MAX
+    ring = max(round(size * 0.032), 1) * SUPERSAMPLE
+    mark = app_mark(
+        canvas,
+        ring=ring,
+        glyph_ratio=0.62 if small else 0.52,
+        stroke=3.2 if small else 2.3,
     )
+    return mark.resize((size, size), Image.LANCZOS)
 
-    # Flag: curved-ish blob to the right of the stem top
-    flag_x = stem_x + stem_w
-    flag_w = int(size * 0.24)
-    flag_top = stem_top
-    flag_bottom = stem_top + int(size * 0.22)
-    d.rounded_rectangle(
-        (flag_x, flag_top, flag_x + flag_w, flag_bottom),
-        radius=max(int(size * 0.06), 1),
-        fill=FG,
+
+def render_tray_icon(size: int, state: str) -> Image.Image:
+    """App mark with a status dot in the bottom-right corner."""
+    canvas = size * SUPERSAMPLE
+    image = render_icon(size).resize((canvas, canvas), Image.LANCZOS)
+    draw = ImageDraw.Draw(image)
+    radius = canvas * 0.2
+    outline = max(canvas * 0.06, SUPERSAMPLE)
+    cx = cy = canvas - radius - outline
+    draw.ellipse(
+        (cx - radius - outline, cy - radius - outline, cx + radius + outline, cy + radius + outline),
+        fill=STATUS_OUTLINE + (255,),
     )
-
-    # Apply rounded mask to clip any overflow
-    mask = rounded_mask(size, radius)
-    img.putalpha(Image.eval(mask, lambda v: v))
-
-    return img
+    draw.ellipse((cx - radius, cy - radius, cx + radius, cy + radius), fill=STATUS_COLORS[state] + (255,))
+    return image.resize((size, size), Image.LANCZOS)
 
 
 def main() -> None:
-    root = Path(__file__).resolve().parent.parent
-    build_dir = root / "build"
-    assets_dir = root / "src" / "renderer" / "assets"
-    tray_dir = assets_dir / "tray"
-    build_dir.mkdir(exist_ok=True)
-    assets_dir.mkdir(exist_ok=True, parents=True)
-    tray_dir.mkdir(exist_ok=True, parents=True)
+    BUILD_DIR.mkdir(exist_ok=True)
+    TRAY_DIR.mkdir(exist_ok=True, parents=True)
 
-    sizes = [16, 24, 32, 48, 64, 128, 256]
-    pngs = []
-    for s in sizes:
-        im = render_icon(s)
-        png_path = assets_dir / f"icon-{s}.png"
-        im.save(png_path, format="PNG")
-        pngs.append(im)
-        if s == 256:
-            im.save(assets_dir / "icon.png", format="PNG")
+    icons = {size: render_icon(size) for size in ICON_SIZES}
+    for size, image in icons.items():
+        image.save(ASSETS_DIR / f"icon-{size}.png", format="PNG")
+    icons[256].save(ASSETS_DIR / "icon.png", format="PNG")
 
-    # Tray icons: 16, 24, 32 with status overlay variants
-    for state, color in (
-        ("playing", (29, 185, 84, 255)),
-        ("idle", (140, 140, 140, 255)),
-        ("error", (226, 33, 52, 255)),
-    ):
-        for s in (16, 24, 32):
-            base = render_icon(s)
-            d = ImageDraw.Draw(base)
-            r = max(int(s * 0.18), 2)
-            cx, cy = s - r - 1, s - r - 1
-            d.ellipse((cx - r, cy - r, cx + r, cy + r), fill=color)
-            base.save(tray_dir / f"tray-{state}-{s}.png", format="PNG")
+    for state in STATUS_COLORS:
+        for size in TRAY_SIZES:
+            render_tray_icon(size, state).save(TRAY_DIR / f"tray-{state}-{size}.png", format="PNG")
 
-    # Build ICO with multiple sizes (electron-builder needs >=256).
-    # Source must be the largest image so Pillow can downscale.
-    ico_path = build_dir / "icon.ico"
-    largest = pngs[-1]
+    # Each ICO entry uses its own hand-tuned render instead of downscaling the 256px image.
+    ico_path = BUILD_DIR / "icon.ico"
+    largest = icons[ICON_SIZES[-1]]
     largest.save(
         ico_path,
         format="ICO",
-        sizes=[(s, s) for s in sizes],
+        sizes=[(size, size) for size in ICON_SIZES],
+        append_images=[icons[size] for size in ICON_SIZES[:-1]],
     )
-    print(f"Wrote {ico_path}")
+    print(f"Wrote {len(ICON_SIZES)} app icons, {len(STATUS_COLORS) * len(TRAY_SIZES)} tray icons and {ico_path.relative_to(ROOT)}")
 
 
 if __name__ == "__main__":

@@ -1,11 +1,12 @@
 import log from 'electron-log';
-import { app, BrowserWindow, ipcMain, Tray, Menu, nativeImage, shell, Notification } from 'electron';
+import { app, BrowserWindow, ipcMain, Tray, Menu, nativeImage, shell, Notification, clipboard } from 'electron';
 import path from 'path';
 import http from 'http';
+import { randomBytes } from 'crypto';
 import { fileURLToPath } from 'url';
 import { isAutoLaunchEnabled, setAutoLaunch } from './autoLaunch.js';
 import { saveConfig, getConfig } from './configManager.js';
-import { refreshAccessToken, getCurrentlyPlaying } from './spotify.js';
+import { refreshAccessToken, getCurrentlyPlaying, buildAuthorizeUrl, exchangeAuthorizationCode, validateAppCredentials } from './spotify.js';
 import { connect as connectOBS, updateTextSource, getOBSsources, createTextSource } from './obs.js';
 import { setupAutoUpdater, registerUpdaterIpc, checkForUpdates } from './updater.js';
 
@@ -58,8 +59,8 @@ function createWindow() {
   const windowState = config.window || {};
 
   mainWindow = new BrowserWindow({
-    width: windowState.width || 880,
-    height: windowState.height || 600,
+    width: windowState.width || 1040,
+    height: windowState.height || 720,
     x: typeof windowState.x === 'number' ? windowState.x : undefined,
     y: typeof windowState.y === 'number' ? windowState.y : undefined,
     minWidth: 720,
@@ -67,7 +68,7 @@ function createWindow() {
     title: 'TrackCast',
     icon: iconPath,
     frame: false,
-    backgroundColor: '#0a0b0a',
+    backgroundColor: '#0d110f',
     webPreferences: {
       preload: path.join(__dirname, 'preload.mjs'),
       contextIsolation: true,
@@ -596,6 +597,19 @@ ipcMain.handle('show-item-in-folder', (event, filePath) => {
   shell.showItemInFolder(filePath);
 });
 
+ipcMain.handle('clipboard-write-text', (event, text) => {
+  clipboard.writeText(String(text));
+  return { success: true };
+});
+
+ipcMain.handle('clipboard-read-text', () => {
+  return clipboard.readText();
+});
+
+ipcMain.handle('get-app-version', () => {
+  return app.getVersion();
+});
+
 ipcMain.handle('get-log-buffer', () => {
   return logBuffer;
 });
@@ -653,80 +667,114 @@ ipcMain.handle('set-auto-launch', async (event, enabled) => {
 // Spotify Auth Server
 // ─────────────────────────────────────────────────────────────
 
-let authResolve = null;
-let authReject = null;
+const AUTH_TIMEOUT_MS = 300000; // 5 minutes
+const DEFAULT_AUTH_PORT = 8888;
+let pendingAuth = null;
 
-ipcMain.handle('wait-for-auth-code', () => {
-  return new Promise((resolve, reject) => {
-    authResolve = resolve;
-    authReject = reject;
-    
-    // Timeout after 5 minutes
-    setTimeout(() => {
-      if (authResolve) {
-        authReject(new Error('Authorization timeout'));
-        authResolve = null;
-        authReject = null;
-      }
-    }, 300000);
-  });
-});
+const AUTH_PAGE_SUCCESS = '<h1>Success!</h1><p>You can close this window and return to TrackCast.</p>';
+const AUTH_PAGE_ERROR = '<h1>Authorization failed</h1><p>Return to TrackCast for details.</p>';
 
-ipcMain.handle('start-auth-server', async (event, config) => {
+function waitForAuthCode(redirectUri, expectedState) {
   return new Promise((resolve, reject) => {
-    const redirectUrl = new URL(config.spotify.redirectUri);
-    const port = redirectUrl.port || 8888;
+    const redirectUrl = new URL(redirectUri);
+    const port = Number(redirectUrl.port) || DEFAULT_AUTH_PORT;
+    let settled = false;
 
     const server = http.createServer((req, res) => {
-      const parsedUrl = new URL(req.url, `http://localhost:${port}`);
+      const parsedUrl = new URL(req.url, redirectUrl.origin);
 
-      if (parsedUrl.pathname === '/callback') {
-        const code = parsedUrl.searchParams.get('code');
-        
-        if (code) {
-          res.writeHead(200, { 'Content-Type': 'text/html' });
-          res.end('<h1>Success!</h1><p>You can close this window. Return to the app.</p>');
-          
-          server.close(() => {
-            if (authResolve) {
-              authResolve(code);
-              authResolve = null;
-              authReject = null;
-            }
-          });
-          
-          resolve(code);
-        } else {
-          res.writeHead(400, { 'Content-Type': 'text/html' });
-          res.end('<h1>Error</h1><p>No authorization code received.</p>');
-          
-          server.close(() => {
-            if (authReject) {
-              authReject(new Error('No authorization code'));
-              authResolve = null;
-              authReject = null;
-            }
-          });
-          
-          reject(new Error('No authorization code'));
-        }
-      } else {
+      if (parsedUrl.pathname !== redirectUrl.pathname) {
         res.writeHead(404);
         res.end('Not found');
+        return;
       }
+
+      const spotifyError = parsedUrl.searchParams.get('error');
+      const code = parsedUrl.searchParams.get('code');
+      const state = parsedUrl.searchParams.get('state');
+
+      let failure = null;
+      if (spotifyError) {
+        failure = new Error(`Spotify authorization was denied (${spotifyError})`);
+      } else if (state !== expectedState) {
+        failure = new Error('Authorization state mismatch. Please try again.');
+      } else if (!code) {
+        failure = new Error('No authorization code received');
+      }
+
+      res.writeHead(failure ? 400 : 200, { 'Content-Type': 'text/html' });
+      res.end(failure ? AUTH_PAGE_ERROR : AUTH_PAGE_SUCCESS);
+      finish(failure, code);
     });
 
-    server.listen(port, () => {
-      console.log('[Auth] Server listening on port', port);
-    });
+    const timeout = setTimeout(() => finish(new Error('Authorization timed out')), AUTH_TIMEOUT_MS);
+
+    function finish(err, code) {
+      if (settled) return;
+      settled = true;
+      clearTimeout(timeout);
+      server.close();
+      pendingAuth = null;
+      if (err) reject(err);
+      else resolve(code);
+    }
 
     server.on('error', (err) => {
-      if (authReject) {
-        authReject(err);
-        authResolve = null;
-        authReject = null;
-      }
-      reject(err);
+      finish(err.code === 'EADDRINUSE'
+        ? new Error(`Port ${port} is already in use. Close the app using it and try again.`)
+        : err);
     });
+
+    // Listen only on the redirect host (loopback), never on all interfaces.
+    server.listen(port, redirectUrl.hostname, () => {
+      log.info('[Auth] Callback server listening on', `${redirectUrl.hostname}:${port}`);
+    });
+
+    pendingAuth = { cancel: () => finish(new Error('Authorization cancelled')) };
   });
+}
+
+ipcMain.handle('spotify-authorize', async (event, credentials) => {
+  if (pendingAuth) pendingAuth.cancel();
+
+  const credentialError = validateAppCredentials(credentials);
+  if (credentialError) {
+    return { success: false, error: credentialError };
+  }
+
+  try {
+    const config = getConfig();
+    config.spotify.clientId = credentials.clientId;
+    config.spotify.clientSecret = credentials.clientSecret;
+    config.spotify.redirectUri = credentials.redirectUri;
+    saveConfig(config);
+
+    const state = randomBytes(16).toString('hex');
+    const codePromise = waitForAuthCode(config.spotify.redirectUri, state);
+
+    try {
+      await shell.openExternal(buildAuthorizeUrl(config.spotify, state));
+    } catch (openError) {
+      if (pendingAuth) pendingAuth.cancel();
+      await codePromise.catch(() => {});
+      throw openError;
+    }
+
+    const code = await codePromise;
+    const tokens = await exchangeAuthorizationCode(config.spotify, code);
+
+    const updatedConfig = getConfig();
+    updatedConfig.spotify.refreshToken = tokens.refreshToken;
+    updatedConfig.spotify.accessToken = tokens.accessToken;
+    updatedConfig.spotify.accessTokenExpiresAt = Date.now() + tokens.expiresInMs;
+    updatedConfig.spotify.redirectUriMigrated = false;
+    saveConfig(updatedConfig);
+    accessToken = tokens.accessToken;
+
+    log.info('[Auth] Spotify authorization successful');
+    return { success: true, config: updatedConfig };
+  } catch (err) {
+    log.error('[Auth] Spotify authorization failed:', err.message);
+    return { success: false, error: err.message };
+  }
 });
